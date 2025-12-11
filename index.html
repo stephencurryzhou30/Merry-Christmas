@@ -4,19 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Merry Christmas from Zhou</title>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
-            background: #0a0a2a;
+            background: radial-gradient(circle at center, #1a1a3a 0%, #03030c 100%);
             overflow: hidden;
-            font-family: Arial, sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            font-family: 'Great Vibes', cursive;
         }
         
         #canvasContainer {
@@ -25,51 +20,80 @@
             height: 100vh;
         }
         
-        canvas {
-            display: block;
-            background: #0a0a2a;
-        }
+        canvas { display: block; }
         
         #loading {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             color: #4ECDC4;
             font-size: 20px;
-            text-align: center;
             z-index: 10;
+            transition: opacity 0.5s;
+            font-family: 'Arial', sans-serif;
         }
 
-        /* 添加文字阴影容器，确保文字清晰 */
         #textContainer {
             position: absolute;
-            top: 0;
+            bottom: 4%; 
             left: 0;
             width: 100%;
-            height: 100%;
+            text-align: center;
             pointer-events: none;
             z-index: 100;
-        }
-
-        .christmas-text {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-            -webkit-text-stroke: 1px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            mix-blend-mode: screen;
         }
 
         #mainText {
-            bottom: 100px;
-            font-size: clamp(20px, 6vw, 40px);
+            font-family: 'Great Vibes', cursive;
+            font-size: clamp(48px, 6vw, 72px);
+            font-weight: 400;
+            letter-spacing: 3px;
+            color: #FFD700;
+            text-shadow: 
+                0 0 10px rgba(255, 215, 0, 0.8),
+                0 0 20px rgba(255, 215, 0, 0.6),
+                0 0 30px rgba(255, 215, 0, 0.4),
+                0 0 40px rgba(255, 107, 157, 0.3),
+                0 5px 15px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            transform: translateY(30px);
+            animation: textFloatIn 2s ease-out forwards 1s;
+            position: relative;
+            display: inline-block;
         }
 
-        #subText {
-            bottom: 70px;
-            font-size: clamp(14px, 4vw, 24px);
+        @keyframes textFloatIn {
+            0% { opacity: 0; transform: translateY(30px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes textGlow {
+            0%, 100% { 
+                text-shadow: 
+                    0 0 10px rgba(255, 215, 0, 0.8),
+                    0 0 20px rgba(255, 215, 0, 0.6),
+                    0 0 30px rgba(255, 215, 0, 0.4),
+                    0 0 40px rgba(255, 107, 157, 0.3),
+                    0 5px 15px rgba(0, 0, 0, 0.5);
+            }
+            50% { 
+                text-shadow: 
+                    0 0 15px rgba(255, 215, 0, 1),
+                    0 0 25px rgba(255, 215, 0, 0.8),
+                    0 0 35px rgba(255, 215, 0, 0.6),
+                    0 0 45px rgba(255, 107, 157, 0.5),
+                    0 5px 15px rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        #mainText {
+            animation: 
+                textFloatIn 2s ease-out forwards 1s,
+                textGlow 3s ease-in-out infinite 3s;
         }
     </style>
 </head>
@@ -77,10 +101,8 @@
     <div id="canvasContainer">
         <canvas id="christmasCanvas"></canvas>
         <div id="loading"></div>
-        <!-- 新增文字容器 -->
         <div id="textContainer">
-            <div id="mainText" class="christmas-text"></div>
-            <div id="subText" class="christmas-text"></div>
+            <div id="mainText">Merry Christmas</div>
         </div>
     </div>
 
@@ -90,767 +112,641 @@
                 this.canvas = document.getElementById('christmasCanvas');
                 this.ctx = this.canvas.getContext('2d');
                 this.loading = document.getElementById('loading');
-                this.mainText = document.getElementById('mainText');
-                this.subText = document.getElementById('subText');
+                
+                this.mouse = { x: 0, y: 0 };
+                this.targetMouse = { x: 0, y: 0 };
                 
                 this.setupCanvas();
                 this.initColors();
+                this.addEventListeners();
                 this.createScene();
                 this.startAnimation();
             }
 
             setupCanvas() {
+                this.dpr = window.devicePixelRatio || 1;
                 this.screenWidth = window.innerWidth;
                 this.screenHeight = window.innerHeight;
-                this.canvas.width = this.screenWidth;
-                this.canvas.height = this.screenHeight;
                 
-                // 设置坐标系原点在中心（模仿Turtle坐标系）
+                this.canvas.width = this.screenWidth * this.dpr;
+                this.canvas.height = this.screenHeight * this.dpr;
+                this.canvas.style.width = this.screenWidth + 'px';
+                this.canvas.style.height = this.screenHeight + 'px';
+                
+                this.ctx.scale(this.dpr, this.dpr);
+                
                 this.centerX = this.screenWidth / 2;
                 this.centerY = this.screenHeight / 2;
                 
-                // 设置高清渲染
-                this.setHighDPICanvas();
+                this.treeBaseY = this.screenHeight * 0.7; 
+                
+                this.treeScale = Math.min(this.screenWidth, this.screenHeight) / 1000;
                 
                 setTimeout(() => {
-                    this.loading.style.display = 'none';
-                }, 500);
+                    this.loading.style.opacity = 0;
+                    setTimeout(() => this.loading.style.display = 'none', 500);
+                }, 300);
             }
 
-            // 设置高清Canvas渲染
-            setHighDPICanvas() {
-                const dpr = window.devicePixelRatio || 1;
-                this.canvas.width = this.screenWidth * dpr;
-                this.canvas.height = this.screenHeight * dpr;
-                this.ctx.scale(dpr, dpr);
-                this.canvas.style.width = this.screenWidth + 'px';
-                this.canvas.style.height = this.screenHeight + 'px';
+            addEventListeners() {
+                window.addEventListener('resize', () => {
+                    this.setupCanvas();
+                    this.createScene(); 
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    this.targetMouse.x = (e.clientX - this.centerX) / this.centerX;
+                    this.targetMouse.y = (e.clientY - this.centerY) / this.centerY;
+                });
             }
 
             initColors() {
-                this.TREE_COLORS = [
-                    "#FF6B9D", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", 
-                    "#DDA0DD", "#98D8C8", "#F7DC6F", "#85C1E9", "#BB8FCE"
-                ];
-                
-                this.GLOW_COLORS = [
-                    "#FF006E", "#00F5D4", "#3A86FF", "#FFBE0B", "#8338EC",
-                    "#FF27B5", "#00FFD1", "#7B68EE", "#FF6347", "#32CD32"
-                ];
-                
-                this.STAR_COLORS = ["#FFD700", "#FFEC8B", "#FFFACD", "#FFFFE0", "#FFA500"];
-                this.TEXT_COLORS = [
-                    "#FF6B9D", "#4ECDC4", "#FFBE0B", "#8338EC", "#00F5D4",
-                    "#FFD700", "#85C1E9", "#BB8FCE", "#FF006E", "#3A86FF"
-                ];
+                this.TREE_COLORS = ["#2E8B57", "#3CB371", "#20B2AA", "#66CDAA", "#00FA9A"];
+                this.LIGHT_COLORS = ["#FF6B9D", "#FFD166", "#7CE6E6", "#FF8AF0", "#FFA552", "#93FF9B"];
+                this.TRUNK_COLORS = ["#5C3317", "#6F4E37", "#8B4513"]; 
             }
 
             createScene() {
-                this.treeScale = Math.min(this.screenWidth, this.screenHeight) / 800;
-                this.createSnowflakes();
-                this.createChristmasTree();
-                this.createMeteors();
-                this.createFloatingOrnaments();
-                this.createTwinkleLights();
-            }
-
-            createSnowflakes() {
+                this.particles = []; 
+                this.lights = [];    
                 this.snowflakes = [];
-                for (let i = 0; i < 180; i++) {
-                    this.snowflakes.push({
-                        // 雪花从屏幕顶部开始，分布在屏幕宽度范围内
-                        x: Math.random() * this.screenWidth,
-                        y: Math.random() * this.screenHeight - this.screenHeight, // 从屏幕上方开始
-                        speed: Math.random() * 1.5 + 0.8,
-                        size: Math.random() * 3 + 2,
-                        amplitude: Math.random() * 1.5 + 1,
-                        frequency: Math.random() * 0.03 + 0.02,
-                        phase: Math.random() * Math.PI * 2,
-                        wobble: Math.random() * 2 + 1,
-                        brightness: Math.floor(Math.random() * 26 + 230),
-                        rotation: Math.random() * Math.PI * 2,
-                        rotationSpeed: (Math.random() - 0.5) * 0.02
-                    });
-                }
+                this.stars = [];     
+                this.topStar = null;
+
+                this.createChristmasTree();
+                this.createSnowflakes();
+                this.createTopStar();
             }
 
             createChristmasTree() {
-                this.tree = {
-                    particles: [],
-                    starParticles: [],
-                    decorationParticles: [],
-                    glowParticles: [],
-                    groundParticles: [],
-                    treeTopParticles: [],
-                    treeTipParticles: []
-                };
-
-                const baseY = -this.screenHeight/2 + 150;
-                const trunkHeight = 120 * this.treeScale;
-
-                // 创建树干
-                const trunkColors = ["#8B4513", "#A0522D", "#CD853F"];
-                for (let y = baseY; y < baseY + trunkHeight; y += 3) {
-                    const width = Math.max(12, 35 * this.treeScale - (y - baseY) * 0.1);
-                    for (let x = -width/2; x < width/2; x += 2) {
-                        if (Math.random() > 0.3) {
-                            this.tree.particles.push(this.createParticle(
-                                x, y, 
-                                trunkColors[Math.floor(Math.random() * trunkColors.length)],
-                                3.0 * this.treeScale,
-                                "tree"
-                            ));
-                        }
+                const trunkHeight = 150 * this.treeScale;
+                const trunkRadius = 40 * this.treeScale;
+                const trunkCount = 800;
+                for (let i = 0; i < trunkCount; i++) {
+                    const p = i / trunkCount;
+                    const y = this.treeBaseY + p * trunkHeight;
+                    const angle = i * 2.39996;
+                    const currentRadius = trunkRadius * (1 - 0.2 * p);
+                    const r = currentRadius * Math.sqrt(Math.random()) * (0.5 + Math.random() * 0.5);
+                    const x = Math.cos(angle) * r;
+                    const z = Math.sin(angle) * r;
+                    let color;
+                    if (z > 0) {
+                        color = this.TRUNK_COLORS[2];
+                    } else if (y > this.treeBaseY + trunkHeight * 0.6) {
+                        color = this.TRUNK_COLORS[0];
+                    } else {
+                        color = this.TRUNK_COLORS[1];
                     }
+                    this.particles.push({
+                        x: x, y: y, z: z,
+                        baseX: x, baseY: y,
+                        color: color,
+                        size: Math.random() * 3 + 3,
+                        swaySpeed: 0,
+                        swayOffset: 0,
+                        isTrunk: true
+                    });
                 }
 
-                // 创建树冠
-                const layers = 8;
-                const maxRadius = 160 * this.treeScale;
+                const particleCount = 2000; 
+                const treeHeight = 550 * this.treeScale; 
+                const maxRadius = 240 * this.treeScale;
                 
-                for (let layer = 0; layer < layers; layer++) {
-                    const layerY = baseY + trunkHeight + layer * 35 * this.treeScale;
-                    const baseRadius = maxRadius - layer * 18 * this.treeScale;
-                    const layerDensity = 70 + layer * 12 - layer * 2;
+                for (let i = 0; i < particleCount; i++) {
+                    const p = i / particleCount; 
+                    const angle = i * 2.39996; 
                     
-                    for (let i = 0; i < layerDensity; i++) {
-                        const angle = (i / layerDensity) * Math.PI * 2;
-                        let radius;
-                        
-                        if (layer === layers - 1) {
-                            radius = baseRadius * 0.4;
-                        } else if (layer === layers - 2) {
-                            radius = baseRadius * 0.65;
-                        } else {
-                            radius = baseRadius * (0.88 + 0.12 * Math.sin(angle * 2));
-                        }
-                        
-                        const x = Math.cos(angle) * radius;
-                        const y = layerY;
-                        
-                        if (Math.abs(x) < 30 * this.treeScale) {
-                            if (Math.random() > 0.1) {
-                                this.tree.particles.push(this.createParticle(
-                                    x, y,
-                                    this.TREE_COLORS[Math.floor(Math.random() * this.TREE_COLORS.length)],
-                                    (Math.random() * 1.7 + 2.8) * this.treeScale,
-                                    "tree"
-                                ));
-                            }
-                        } else {
-                            if (Math.random() > 0.3) {
-                                this.tree.particles.push(this.createParticle(
-                                    x, y,
-                                    this.TREE_COLORS[Math.floor(Math.random() * this.TREE_COLORS.length)],
-                                    (Math.random() * 1.6 + 2.2) * this.treeScale,
-                                    "tree"
-                                ));
-                            }
-                        }
+                    const currentHeight = treeHeight * p;
+                    const currentRadius = maxRadius * (1 - p);
+                    
+                    const r = currentRadius * Math.sqrt(Math.random()) * (0.8 + Math.random() * 0.4);
+                    
+                    const x = Math.cos(angle) * r;
+                    const y = this.treeBaseY - currentHeight; 
+                    const z = Math.sin(angle) * r;
+
+                    if (Math.random() < 0.18) {
+                        const color = this.LIGHT_COLORS[Math.floor(Math.random() * this.LIGHT_COLORS.length)];
+                        const size = Math.random() * 3 + 2;
+                        const pulseSpeed = 1.0 + Math.random() * 3.5;
+                        const phase = Math.random() * Math.PI * 2;
+                        const baseAlpha = 0.5 + Math.random() * 0.6;
+                        const sparkleChance = Math.random() < 0.15 ? 0.01 + Math.random()*0.03 : 0;
+                        const glow = 8 + Math.random() * 24;
+                        this.lights.push({
+                            x: x, y: y, z: z,
+                            baseX: x, baseY: y,
+                            color: color,
+                            size: size,
+                            blinkSpeed: pulseSpeed,
+                            blinkOffset: phase,
+                            baseAlpha: baseAlpha,
+                            sparkleChance: sparkleChance,
+                            glow: glow,
+                            flickerSeed: Math.random() * 1000
+                        });
+                    } else {
+                        this.particles.push({
+                            x: x, y: y, z: z,
+                            baseX: x, baseY: y,
+                            color: this.TREE_COLORS[Math.floor(Math.random() * this.TREE_COLORS.length)],
+                            size: Math.random() * 1.5 + 0.5,
+                            swaySpeed: Math.random() * 2 + 1,
+                            swayOffset: Math.random() * Math.PI * 2,
+                            isTrunk: false
+                        });
                     }
                 }
-
-                // 创建树脊柱
-                this.createTreeSpine(baseY, trunkHeight);
-
-                // 创建树尖
-                this.createTreeTip(baseY, trunkHeight);
-
-                // 创建星星
-                this.createStar(baseY, trunkHeight);
-
-                // 创建顶部效果
-                this.createTreeTopEffect(baseY, trunkHeight);
-
-                // 创建装饰球
-                this.createDecorations(baseY, trunkHeight);
-
-                // 创建光晕效果
-                this.createGlowEffects();
-
-                // 创建雪地
-                this.createSnowGround();
             }
 
-            createParticle(x, y, color, size, type) {
-                return {
-                    x: x, y: y,
-                    originalX: x, originalY: y,
-                    color: color,
-                    size: size,
-                    currentSize: size,
-                    type: type,
-                    speed: Math.random() * 0.04 + 0.03,
-                    phase: Math.random() * Math.PI * 2,
-                    amplitude: Math.random() * 2 + 1,
-                    pulseSpeed: Math.random() * 0.05 + 0.05,
-                    glowIntensity: 0
+            createTopStar() {
+                const treeHeight = 550 * this.treeScale;
+                const topY = this.treeBaseY - treeHeight; 
+                
+                // 修正星星参数
+                this.topStar = {
+                    x: this.centerX,
+                    y: topY - 15, // 稍微向上调整
+                    size: 24 * this.treeScale, // 调整大小
+                    color: '#FFD700',
+                    rotation: 0,
+                    pulseSpeed: 0.8,
+                    glowSize: 40 * this.treeScale,
+                    spikes: 5,
+                    innerRadius: 0.4, // 调整内半径比例，让星星更明显
+                    outerRadius: 1,
+                    time: 0,
+                    sparkleInterval: 0
                 };
             }
 
-            createTreeSpine(baseY, trunkHeight) {
-                const spineYPositions = [
-                    baseY + trunkHeight,
-                    baseY + trunkHeight + 80,
-                    baseY + trunkHeight + 160,
-                    baseY + trunkHeight + 240,
-                    baseY + trunkHeight + 300
-                ];
-                
-                for (let y of spineYPositions) {
-                    const radius = Math.max(6, 120 * this.treeScale - (y - baseY - trunkHeight) * 0.6);
-                    for (let x = -radius/2; x < radius/2; x += 2) {
-                        if (Math.random() > 0.05) {
-                            this.tree.particles.push(this.createParticle(
-                                x, y,
-                                this.TREE_COLORS[Math.floor(Math.random() * 4) + 2],
-                                (Math.random() * 1.6 + 3.2) * this.treeScale,
-                                "tree"
-                            ));
-                        }
-                    }
-                }
-            }
-
-            createTreeTip(baseY, trunkHeight) {
-                const tipX = 0;
-                const tipY = baseY + trunkHeight + 7 * 35 * this.treeScale + 30;
-                
-                for (let i = 0; i < 25; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const distance = Math.random() * 7 * this.treeScale;
-                    const x = tipX + Math.cos(angle) * distance;
-                    const y = tipY + Math.sin(angle) * distance;
-                    const colors = ["#4ECDC4", "#45B7D1", "#85C1E9"];
-                    
-                    this.tree.treeTipParticles.push(this.createParticle(
-                        x, y,
-                        colors[Math.floor(Math.random() * colors.length)],
-                        (Math.random() * 1.5 + 3.0) * this.treeScale,
-                        "tip"
-                    ));
-                }
-            }
-
-            createStar(baseY, trunkHeight) {
-                const starCenterX = 0;
-                const starCenterY = baseY + trunkHeight + 7 * 35 * this.treeScale + 50 * this.treeScale;
-                
-                // 星星核心
-                for (let i = 0; i < 80; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const distance = Math.random() * 10 * this.treeScale;
-                    const x = starCenterX + Math.cos(angle) * distance;
-                    const y = starCenterY + Math.sin(angle) * distance;
-                    
-                    this.tree.starParticles.push(this.createParticle(
-                        x, y,
-                        this.STAR_COLORS[Math.floor(Math.random() * this.STAR_COLORS.length)],
-                        (Math.random() * 2.5 + 3.5) * this.treeScale,
-                        "star"
-                    ));
-                }
-                
-                // 星光射线
-                for (let ray = 0; ray < 12; ray++) {
-                    const angle = ray * (Math.PI * 2 / 12);
-                    for (let distance = 25; distance < 100; distance += 6) {
-                        const distScaled = distance * this.treeScale;
-                        const x = starCenterX + Math.cos(angle) * distScaled;
-                        const y = starCenterY + Math.sin(angle) * distScaled;
-                        const size = Math.max(1.5, 3.5 - distance * 0.02) * this.treeScale;
-                        
-                        this.tree.starParticles.push(this.createParticle(
-                            x, y,
-                            ["#FFEC8B", "#FFFACD", "#FFFFFF"][Math.floor(Math.random() * 3)],
-                            size,
-                            "star_ray"
-                        ));
-                    }
-                }
-            }
-
-            createTreeTopEffect(baseY, trunkHeight) {
-                const topX = 0;
-                const topY = baseY + trunkHeight + 7 * 35 * this.treeScale + 50 * this.treeScale;
-                
-                // 向上光束
-                for (let beam = 0; beam < 8; beam++) {
-                    const angle = Math.PI / 2 + (Math.random() * 0.4 - 0.2);
-                    for (let distance = 40; distance < 120; distance += 8) {
-                        const distScaled = distance * this.treeScale;
-                        const x = topX + Math.cos(angle) * distScaled * 0.12;
-                        const y = topY + Math.sin(angle) * distScaled;
-                        const size = Math.max(1.2, 3.2 - distance * 0.015) * this.treeScale;
-                        
-                        this.tree.treeTopParticles.push(this.createParticle(
-                            x, y,
-                            ["#E6F3FF", "#F0F8FF", "#F5F5F5"][Math.floor(Math.random() * 3)],
-                            size,
-                            "top_beam"
-                        ));
-                    }
-                }
-                
-                // 光点
-                for (let i = 0; i < 40; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const distance = (Math.random() * 28 + 12) * this.treeScale;
-                    const x = topX + Math.cos(angle) * distance;
-                    const y = topY + Math.sin(angle) * distance;
-                    
-                    this.tree.treeTopParticles.push(this.createParticle(
-                        x, y,
-                        ["#4ECDC4", "#45B7D1", "#85C1E9", "#BB8FCE"][Math.floor(Math.random() * 4)],
-                        (Math.random() * 1.5 + 2.0) * this.treeScale,
-                        "top_glow"
-                    ));
-                }
-            }
-
-            createDecorations(baseY, trunkHeight) {
-                const decorationPositions = [
-                    [0, baseY + trunkHeight - 10],
-                    [50 * this.treeScale, baseY + trunkHeight + 15],
-                    [-45 * this.treeScale, baseY + trunkHeight + 40],
-                    [65 * this.treeScale, baseY + trunkHeight + 65],
-                    [-55 * this.treeScale, baseY + trunkHeight + 90],
-                    [40 * this.treeScale, baseY + trunkHeight + 115],
-                    [-50 * this.treeScale, baseY + trunkHeight + 140],
-                    [35 * this.treeScale, baseY + trunkHeight + 165]
-                ];
-                
-                for (let [x, y] of decorationPositions) {
-                    for (let i = 0; i < 15; i++) {
-                        const angle = Math.random() * Math.PI * 2;
-                        const distance = Math.random() * 12 * this.treeScale;
-                        const decoX = x + Math.cos(angle) * distance;
-                        const decoY = y + Math.sin(angle) * distance;
-                        
-                        this.tree.decorationParticles.push(this.createParticle(
-                            decoX, decoY,
-                            this.GLOW_COLORS[Math.floor(Math.random() * this.GLOW_COLORS.length)],
-                            (Math.random() * 2.5 + 3.5) * this.treeScale,
-                            "decoration"
-                        ));
-                    }
-                }
-            }
-
-            createGlowEffects() {
-                for (let i = 0; i < 80; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const distance = (Math.random() * 200 + 200) * this.treeScale;
-                    const x = Math.cos(angle) * distance;
-                    const y = -60 + Math.sin(angle) * distance * 0.4;
-                    
-                    this.tree.glowParticles.push(this.createParticle(
-                        x, y,
-                        this.GLOW_COLORS[Math.floor(Math.random() * this.GLOW_COLORS.length)],
-                        (Math.random() * 2.0 + 2.0) * this.treeScale,
-                        "glow"
-                    ));
-                }
-            }
-
-            createSnowGround() {
-                const groundY = -this.screenHeight/2 + 50;
-                for (let i = 0; i < 150; i++) {
-                    const x = Math.random() * this.screenWidth - this.centerX;
-                    const y = Math.random() * 40 + groundY - 40;
-                    const size = (Math.random() * 2.3 + 1.5) * this.treeScale;
-                    const brightness = Math.floor(Math.random() * 26 + 230);
-                    const color = `rgb(${brightness}, ${brightness}, ${Math.floor(Math.random() * 11 + 245)})`;
-                    
-                    this.tree.groundParticles.push(this.createParticle(
-                        x, y, color, size, "ground"
-                    ));
-                }
-            }
-
-            createMeteors() {
-                this.meteors = [];
-                for (let i = 0; i < 3; i++) {
-                    this.meteors.push({
-                        x: Math.random() * this.screenWidth - this.centerX,
-                        y: this.screenHeight/2,
-                        speedX: (Math.random() - 0.5) * 4,
-                        speedY: Math.random() * 5 - 15,
-                        color: this.GLOW_COLORS[Math.floor(Math.random() * this.GLOW_COLORS.length)],
-                        size: Math.random() * 2 + 4,
-                        trail: [],
-                        maxTrail: 12,
-                        active: true
+            createSnowflakes() {
+                for (let i = 0; i < 300; i++) {
+                    this.snowflakes.push({
+                        x: Math.random() * this.screenWidth,
+                        y: Math.random() * this.screenHeight,
+                        z: Math.random() * 2 + 0.5, 
+                        size: Math.random() * 3 + 2,
+                        speedY: Math.random() * 1 + 0.5,
+                        swayAmp: Math.random() * 2,
+                        swayFreq: Math.random() * 0.02,
+                        opacity: Math.random() * 0.6 + 0.3,
+                        rotation: Math.random() * Math.PI * 2,
+                        rotationSpeed: (Math.random() - 0.5) * 0.03,
+                        type: Math.floor(Math.random() * 3)
                     });
                 }
             }
 
-            createFloatingOrnaments() {
-                this.ornaments = [];
-                for (let i = 0; i < 15; i++) {
-                    this.ornaments.push({
-                        x: Math.random() * (this.screenWidth - 200) - this.centerX + 100,
-                        y: Math.random() * (this.screenHeight/3 + this.screenHeight/4) - this.screenHeight/4,
-                        size: Math.random() * 4 + 4,
-                        color: this.GLOW_COLORS[Math.floor(Math.random() * this.GLOW_COLORS.length)],
-                        speedX: (Math.random() - 0.5) * 0.5,
-                        speedY: (Math.random() - 0.5) * 0.3,
-                        pulseSpeed: Math.random() * 0.2 + 0.1,
-                        phase: Math.random() * Math.PI * 2,
-                        amplitude: Math.random() * 3 + 2
-                    });
-                }
+            noise(seed, t) {
+                return (Math.sin(t * 0.7 + seed * 12.345) + Math.sin(t * 1.3 + seed * 4.56)*0.5) * 0.5;
             }
 
-            createTwinkleLights() {
-                this.twinkleLights = [];
-                const baseY = -this.screenHeight/2 + 150;
-                const trunkHeight = 120 * this.treeScale;
-                const maxRadius = 200 * this.treeScale;
+            update() {
+                const time = Date.now() / 1000;
                 
-                for (let i = 0; i < 50; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const distance = Math.random() * (maxRadius - 180 * this.treeScale) + 180 * this.treeScale;
-                    const x = Math.cos(angle) * distance;
-                    const y = baseY + trunkHeight + (Math.random() * 300 - 50) * this.treeScale;
+                this.mouse.x += (this.targetMouse.x - this.mouse.x) * 0.05;
+                this.mouse.y += (this.targetMouse.y - this.mouse.y) * 0.05;
+
+                this.particles.forEach(p => {
+                    const rotation = this.mouse.x * 0.3;
+                    const cos = Math.cos(rotation);
+                    const sin = Math.sin(rotation);
                     
-                    this.twinkleLights.push({
-                        x: x, y: y,
-                        originalX: x, originalY: y,
-                        size: Math.random() * 1.5 + 1.5,
-                        color: this.GLOW_COLORS[Math.floor(Math.random() * this.GLOW_COLORS.length)],
-                        phase: Math.random() * Math.PI * 2,
-                        speed: Math.random() * 0.3 + 0.2,
-                        amplitude: Math.random() * 1 + 0.5
-                    });
+                    const rotatedX = p.baseX * cos - p.z * sin;
+                    const rotatedZ = p.z * cos + p.baseX * sin;
+                    
+                    p.x = rotatedX + this.centerX;
+                    
+                    if (!p.isTrunk) {
+                        p.y = p.baseY + Math.sin(time * p.swaySpeed + p.swayOffset) * 2; 
+                    } else {
+                        p.y = p.baseY;
+                    }
+                });
+
+                this.lights.forEach(l => {
+                    const rotation = this.mouse.x * 0.3;
+                    const cos = Math.cos(rotation);
+                    const sin = Math.sin(rotation);
+                    
+                    const rotatedX = l.baseX * cos - l.z * sin;
+                    const rotatedZ = l.z * cos + l.baseX * sin;
+
+                    l.x = rotatedX + this.centerX;
+                    l.y = l.baseY;
+
+                    const sinPart = (Math.sin(time * l.blinkSpeed + l.blinkOffset) + 1) / 2;
+                    const noisePart = (this.noise(l.flickerSeed, time) + 1) / 2 * 0.25;
+                    l.alpha = Math.min(1, l.baseAlpha * (0.6 + 0.8 * sinPart) + noisePart);
+
+                    l.x += Math.sin(time * 2 + l.flickerSeed) * 0.6;
+                    l.y += Math.cos(time * 1.5 + l.flickerSeed) * 0.4;
+
+                    if (l.sparkleChance > 0 && Math.random() < l.sparkleChance) {
+                        l._sparkle = 0.9 + Math.random() * 0.5;
+                        l._sparkleTimer = 6 + Math.floor(Math.random()*8);
+                    }
+                    if (l._sparkleTimer > 0) {
+                        l._sparkleTimer--;
+                        l.alpha = Math.min(1.4, l.alpha + (l._sparkle || 0));
+                        if (l._sparkleTimer === 0) { l._sparkle = 0; }
+                    }
+                });
+
+                this.snowflakes.forEach(s => {
+                    s.y += s.speedY * s.z; 
+                    s.x += Math.sin(time + s.y * 0.01) * s.swayAmp - this.mouse.x * 2; 
+                    s.rotation += s.rotationSpeed;
+                    
+                    if (s.y > this.screenHeight) {
+                        s.y = -10;
+                        s.x = Math.random() * this.screenWidth;
+                    }
+                    if (s.x > this.screenWidth) s.x = 0;
+                    if (s.x < 0) s.x = this.screenWidth;
+                });
+
+                // 更新顶部星星
+                if (this.topStar) {
+                    this.topStar.time = time;
+                    this.topStar.rotation += 0.003;
+                    
+                    this.topStar.size = 24 * this.treeScale + Math.sin(time * this.topStar.pulseSpeed) * 3;
+                    this.topStar.glowSize = 40 * this.treeScale + Math.sin(time * 1.5) * 8;
+                    
+                    this.topStar.sparkleInterval++;
+                    if (this.topStar.sparkleInterval > 30 + Math.random() * 50) {
+                        this.topStar.sparkleInterval = 0;
+                        this.topStar._sparkle = 2.0 + Math.random() * 1.5;
+                        this.topStar._sparkleTimer = 15;
+                    }
                 }
             }
 
-            updateParticles() {
-                const currentTime = Date.now() * 0.001;
+            drawLightGlow(x, y, size, color, alpha, glow) {
+                const ctx = this.ctx;
+                const g = ctx.createRadialGradient(x, y, 0, x, y, glow);
+                g.addColorStop(0, `rgba(255,255,255,${Math.min(1, alpha*1.2)})`);
+                g.addColorStop(0.1, this.hexToRgba(color, alpha));
+                g.addColorStop(0.6, this.hexToRgba(color, alpha*0.28));
+                g.addColorStop(1, this.hexToRgba(color, 0));
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                ctx.arc(x, y, glow, 0, Math.PI*2);
+                ctx.fill();
 
-                // 更新树粒子
-                const allParticles = [
-                    ...this.tree.particles,
-                    ...this.tree.starParticles,
-                    ...this.tree.decorationParticles,
-                    ...this.tree.glowParticles,
-                    ...this.tree.groundParticles,
-                    ...this.tree.treeTopParticles,
-                    ...this.tree.treeTipParticles
-                ];
-
-                for (let particle of allParticles) {
-                    if (particle.type === "tree") {
-                        particle.x = particle.originalX + Math.sin(currentTime * particle.speed + particle.phase) * particle.amplitude;
-                        particle.y = particle.originalY + Math.cos(currentTime * particle.speed * 1.3 + particle.phase) * particle.amplitude * 0.7;
-                    }
-                    
-                    const pulse = (Math.sin(currentTime * particle.pulseSpeed) + 1) * 0.2 + 0.8;
-                    particle.currentSize = particle.size * pulse;
-                    
-                    particle.glowIntensity = (Math.sin(currentTime * 2 + particle.phase) + 1) * 0.3;
-                    
-                    if (Math.random() < 0.005) {
-                        particle.color = this.TREE_COLORS[Math.floor(Math.random() * this.TREE_COLORS.length)];
-                    }
-                }
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI*2);
+                ctx.fillStyle = this.hexToRgba(color, Math.min(1, alpha*1.1));
+                ctx.fill();
             }
 
-            updateSnowflakes() {
-                const currentTime = Date.now() * 0.001;
+            // 修复的星星绘制函数
+            drawStar(x, y, spikes, outerRadius, innerRadius, color, rotation = 0) {
+                const ctx = this.ctx;
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(rotation);
                 
-                for (let snowflake of this.snowflakes) {
-                    // 向下飘落（增加Y坐标）
-                    snowflake.y += snowflake.speed;
-                    // 左右飘动
-                    snowflake.x += Math.sin(currentTime * snowflake.frequency + snowflake.phase) * snowflake.amplitude;
-                    // 轻微上下浮动
-                    snowflake.y += Math.sin(currentTime * snowflake.wobble) * 0.3;
-                    // 旋转
-                    snowflake.rotation += snowflake.rotationSpeed;
-                    
-                    // 边界检查 - 当雪花落到屏幕底部时重置到顶部
-                    if (snowflake.y > this.screenHeight) {
-                        snowflake.x = Math.random() * this.screenWidth;
-                        snowflake.y = -Math.random() * 100;
-                        snowflake.speed = Math.random() * 1.5 + 0.8;
-                    }
-                    if (snowflake.x > this.screenWidth + 50 || snowflake.x < -50) {
-                        snowflake.x = Math.random() * this.screenWidth;
-                    }
-                }
-            }
-
-            updateMeteors() {
-                for (let meteor of this.meteors) {
-                    if (!meteor.active) {
-                        if (Math.random() < 0.03) {
-                            meteor.x = Math.random() * this.screenWidth - this.centerX;
-                            meteor.y = this.screenHeight/2;
-                            meteor.speedY = Math.random() * 5 - 15;
-                            meteor.active = true;
-                            meteor.trail = [];
-                        }
-                        continue;
-                    }
-                    
-                    meteor.x += meteor.speedX;
-                    meteor.y += meteor.speedY;
-                    meteor.speedY += 0.12;
-                    
-                    meteor.trail.push({x: meteor.x, y: meteor.y, life: 1.0});
-                    if (meteor.trail.length > meteor.maxTrail) {
-                        meteor.trail.shift();
-                    }
-                    
-                    for (let trail of meteor.trail) {
-                        trail.life -= 0.15;
-                    }
-                    
-                    if (meteor.y < -this.screenHeight/2 + 50 || Math.abs(meteor.x) > this.screenWidth/2) {
-                        meteor.active = false;
-                    }
-                }
-            }
-
-            updateOrnaments() {
-                const currentTime = Date.now() * 0.001;
+                // 确保星星绘制完整
+                const angleStep = (Math.PI * 2) / spikes;
+                const halfAngleStep = angleStep / 2;
                 
-                for (let ornament of this.ornaments) {
-                    ornament.x += ornament.speedX + Math.sin(currentTime * 0.5 + ornament.phase) * 0.3;
-                    ornament.y += ornament.speedY + Math.cos(currentTime * 0.7 + ornament.phase * 1.3) * 0.2;
-                    
-                    if (Math.abs(ornament.x) > this.screenWidth/2 - 50) {
-                        ornament.speedX *= -1;
-                    }
-                    if (ornament.y > this.screenHeight/3 || ornament.y < -this.screenHeight/3) {
-                        ornament.speedY *= -1;
-                    }
-                    
-                    ornament.currentSize = ornament.size * (0.8 + 0.4 * Math.sin(currentTime * ornament.pulseSpeed));
-                }
-            }
-
-            updateTwinkleLights() {
-                const currentTime = Date.now() * 0.001;
+                ctx.beginPath();
                 
-                for (let light of this.twinkleLights) {
-                    light.x = light.originalX + Math.sin(currentTime * light.speed + light.phase) * light.amplitude;
-                    light.y = light.originalY + Math.cos(currentTime * light.speed * 1.2 + light.phase) * light.amplitude * 0.8;
-                    light.currentSize = light.size * (0.6 + 0.5 * Math.sin(currentTime * 3 + light.phase));
+                // 从顶部开始
+                for (let i = 0; i < spikes; i++) {
+                    // 外角
+                    const outerAngle = i * angleStep - Math.PI / 2;
+                    const outerX = Math.cos(outerAngle) * outerRadius;
+                    const outerY = Math.sin(outerAngle) * outerRadius;
+                    
+                    // 内角
+                    const innerAngle = outerAngle + halfAngleStep;
+                    const innerX = Math.cos(innerAngle) * innerRadius;
+                    const innerY = Math.sin(innerAngle) * innerRadius;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(outerX, outerY);
+                    } else {
+                        ctx.lineTo(outerX, outerY);
+                    }
+                    
+                    ctx.lineTo(innerX, innerY);
                 }
-            }
-
-            // 更新文字显示
-            updateText() {
-                const currentTime = Date.now() * 0.001;
-                const textColorIndex = Math.floor(currentTime * 2) % this.TEXT_COLORS.length;
-                const textColor = this.TEXT_COLORS[textColorIndex];
-                const subTextColor = this.TEXT_COLORS[(textColorIndex + 5) % this.TEXT_COLORS.length];
-
-                // 更新主文字
-                this.mainText.style.color = textColor;
-                this.mainText.textContent = "Merry Christmas";
-
-                // 更新副文字
-                this.subText.style.color = subTextColor;
-                this.subText.textContent = "圣诞快乐霸总们";
-            }
-
-            drawSnowflake(snowflake) {
-                this.ctx.save();
-                this.ctx.translate(snowflake.x, snowflake.y);
-                this.ctx.rotate(snowflake.rotation);
                 
-                // 绘制六角形雪花
-                this.ctx.beginPath();
+                // 回到起点
+                const firstOuterX = Math.cos(-Math.PI / 2) * outerRadius;
+                const firstOuterY = Math.sin(-Math.PI / 2) * outerRadius;
+                ctx.lineTo(firstOuterX, firstOuterY);
+                
+                ctx.closePath();
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 绘制六边形雪花
+            drawHexagonSnowflake(x, y, size, rotation, opacity) {
+                const ctx = this.ctx;
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(rotation);
+                ctx.globalAlpha = opacity;
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, size * 0.3, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+                ctx.fill();
+                
                 for (let i = 0; i < 6; i++) {
-                    const angle = (i * Math.PI) / 3;
-                    this.ctx.lineTo(
-                        Math.cos(angle) * snowflake.size,
-                        Math.sin(angle) * snowflake.size
-                    );
-                }
-                this.ctx.closePath();
-                this.ctx.fillStyle = `rgba(${snowflake.brightness}, ${snowflake.brightness}, 255, 0.8)`;
-                this.ctx.fill();
-                
-                this.ctx.restore();
-            }
-
-            drawParticle(particle) {
-                const screenX = particle.x + this.centerX;
-                const screenY = this.centerY - particle.y; // 注意：这里需要反转Y轴
-                
-                this.ctx.beginPath();
-                this.ctx.arc(screenX, screenY, particle.currentSize / 2, 0, Math.PI * 2);
-                this.ctx.fillStyle = particle.color;
-                this.ctx.fill();
-                
-                if (particle.glowIntensity > 0.1 && Math.random() < 0.3) {
-                    const glowSize = particle.currentSize * (1 + particle.glowIntensity);
-                    const glowColor = this.adjustBrightness(particle.color, 1.2);
+                    ctx.rotate(Math.PI / 3);
                     
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(0, size);
+                    ctx.lineWidth = size * 0.15;
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+                    ctx.stroke();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, size * 0.3);
+                    ctx.lineTo(size * 0.4, size * 0.5);
+                    ctx.moveTo(0, size * 0.3);
+                    ctx.lineTo(-size * 0.4, size * 0.5);
+                    
+                    ctx.moveTo(0, size * 0.7);
+                    ctx.lineTo(size * 0.3, size * 0.6);
+                    ctx.moveTo(0, size * 0.7);
+                    ctx.lineTo(-size * 0.3, size * 0.6);
+                    
+                    ctx.lineWidth = size * 0.1;
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+            }
+
+            // 绘制星形雪花
+            drawStarSnowflake(x, y, size, rotation, opacity) {
+                const ctx = this.ctx;
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(rotation);
+                ctx.globalAlpha = opacity;
+                
+                for (let i = 0; i < 6; i++) {
+                    ctx.rotate(Math.PI / 3);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(0, size);
+                    
+                    ctx.moveTo(size * 0.2, size * 0.4);
+                    ctx.lineTo(-size * 0.2, size * 0.4);
+                    ctx.moveTo(size * 0.15, size * 0.7);
+                    ctx.lineTo(-size * 0.15, size * 0.7);
+                    
+                    ctx.lineWidth = size * 0.08;
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+                    ctx.stroke();
+                }
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, size * 0.2, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+                ctx.fill();
+                
+                ctx.restore();
+            }
+
+            // 绘制花形雪花
+            drawFlowerSnowflake(x, y, size, rotation, opacity) {
+                const ctx = this.ctx;
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(rotation);
+                ctx.globalAlpha = opacity;
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, size * 0.2, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+                ctx.fill();
+                
+                for (let i = 0; i < 6; i++) {
+                    ctx.rotate(Math.PI / 3);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.quadraticCurveTo(size * 0.3, size * 0.2, 0, size);
+                    ctx.quadraticCurveTo(-size * 0.3, size * 0.2, 0, 0);
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, size * 0.5);
+                    ctx.lineTo(0, size * 0.8);
+                    ctx.lineWidth = size * 0.05;
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+            }
+
+            hexToRgba(hex, alpha=1) {
+                const h = hex.replace('#','');
+                const bigint = parseInt(h.length === 3 ? h.split('').map(c=>c+c).join('') : h, 16);
+                const r = (bigint >> 16) & 255;
+                const g = (bigint >> 8) & 255;
+                const b = bigint & 255;
+                return `rgba(${r},${g},${b},${alpha})`;
+            }
+
+            drawSparkle(x, y, size, intensity) {
+                const ctx = this.ctx;
+                const len = size * (1 + intensity * 0.6);
+                ctx.save();
+                ctx.globalAlpha = Math.min(1, intensity);
+                ctx.lineWidth = Math.max(1, size * 0.12);
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                ctx.beginPath();
+                ctx.moveTo(x - len, y);
+                ctx.lineTo(x + len, y);
+                ctx.moveTo(x, y - len);
+                ctx.lineTo(x, y + len);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            draw() {
+                this.ctx.fillStyle = "#0a0a2a";
+                this.ctx.fillRect(0, 0, this.screenWidth, this.screenHeight);
+
+                this.ctx.globalCompositeOperation = 'lighter';
+
+                // 绘制树叶与树干
+                this.particles.forEach(p => {
                     this.ctx.beginPath();
-                    this.ctx.arc(screenX, screenY, glowSize / 2, 0, Math.PI * 2);
-                    this.ctx.fillStyle = glowColor;
-                    this.ctx.globalAlpha = 0.6;
+                    const sizeMultiplier = p.isTrunk ? 1.5 : 1;
+                    this.ctx.arc(p.x, p.y, p.size * this.treeScale * sizeMultiplier, 0, Math.PI * 2);
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.isTrunk ? 0.9 : 0.6;
                     this.ctx.fill();
-                    this.ctx.globalAlpha = 1.0;
-                }
-            }
+                });
 
-            drawMeteor(meteor) {
-                if (!meteor.active) return;
-                
-                for (let trail of meteor.trail) {
-                    if (trail.life > 0) {
-                        const screenX = trail.x + this.centerX;
-                        const screenY = this.centerY - trail.y; // 注意：这里需要反转Y轴
-                        const size = meteor.size * trail.life * 0.6;
-                        
-                        this.ctx.beginPath();
-                        this.ctx.arc(screenX, screenY, size / 2, 0, Math.PI * 2);
-                        this.ctx.fillStyle = meteor.color;
-                        this.ctx.globalAlpha = trail.life;
-                        this.ctx.fill();
-                        this.ctx.globalAlpha = 1.0;
+                // 绘制灯珠
+                this.lights.forEach(l => {
+                    let depthBoost = l.z > 0 ? 1.1 : 1.0;
+                    this.drawLightGlow(l.x, l.y, l.size * this.treeScale, l.color, l.alpha * depthBoost, l.glow * this.treeScale);
+                    
+                    if (Math.random() < 0.02) {
+                        this.drawSparkle(
+                            l.x + (Math.random()-0.5)*4,
+                            l.y + (Math.random()-0.5)*4,
+                            Math.max(2, l.size*2),
+                            0.9 + Math.random()*0.6
+                        );
                     }
-                }
-                
-                const screenX = meteor.x + this.centerX;
-                const screenY = this.centerY - meteor.y; // 注意：这里需要反转Y轴
-                
-                this.ctx.beginPath();
-                this.ctx.arc(screenX, screenY, meteor.size / 2, 0, Math.PI * 2);
-                this.ctx.fillStyle = meteor.color;
-                this.ctx.fill();
-            }
+                });
 
-            drawOrnament(ornament) {
-                const screenX = ornament.x + this.centerX;
-                const screenY = this.centerY - ornament.y; // 注意：这里需要反转Y轴
+                // 绘制顶部星星 - 确保星星在最前面
+                if (this.topStar) {
+                    const star = this.topStar;
+                    const time = Date.now() / 1000;
+                    
+                    // 保存当前状态
+                    this.ctx.save();
+                    
+                    // 绘制光晕
+                    const glowGradient = this.ctx.createRadialGradient(
+                        star.x, star.y, 0,
+                        star.x, star.y, star.glowSize
+                    );
+                    
+                    glowGradient.addColorStop(0, 'rgba(255, 255, 200, 0.9)');
+                    glowGradient.addColorStop(0.3, 'rgba(255, 215, 0, 0.6)');
+                    glowGradient.addColorStop(0.7, 'rgba(255, 140, 0, 0.3)');
+                    glowGradient.addColorStop(1, 'rgba(255, 140, 0, 0)');
+                    
+                    this.ctx.globalCompositeOperation = 'lighter';
+                    this.ctx.fillStyle = glowGradient;
+                    this.ctx.beginPath();
+                    this.ctx.arc(star.x, star.y, star.glowSize, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    
+                    // 绘制内层光晕
+                    const innerGlowGradient = this.ctx.createRadialGradient(
+                        star.x, star.y, 0,
+                        star.x, star.y, star.glowSize * 0.6
+                    );
+                    
+                    innerGlowGradient.addColorStop(0, 'rgba(255, 255, 230, 0.9)');
+                    innerGlowGradient.addColorStop(0.5, 'rgba(255, 215, 0, 0.6)');
+                    innerGlowGradient.addColorStop(1, 'rgba(255, 215, 0, 0)');
+                    
+                    this.ctx.fillStyle = innerGlowGradient;
+                    this.ctx.beginPath();
+                    this.ctx.arc(star.x, star.y, star.glowSize * 0.6, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    
+                    // 绘制星星主体 - 使用修复后的绘制函数
+                    this.ctx.globalCompositeOperation = 'source-over';
+                    this.drawStar(
+                        star.x, 
+                        star.y, 
+                        star.spikes, 
+                        star.size, 
+                        star.size * star.innerRadius, 
+                        '#FFD700', 
+                        star.rotation
+                    );
+                    
+                    // 绘制星星高光
+                    this.drawStar(
+                        star.x, 
+                        star.y, 
+                        star.spikes, 
+                        star.size * 0.7,
+                        star.size * 0.7 * star.innerRadius, 
+                        '#FFFACD', 
+                        star.rotation + 0.1
+                    );
+                    
+                    // 绘制中心亮点
+                    this.ctx.beginPath();
+                    this.ctx.arc(star.x, star.y, star.size * 0.3, 0, Math.PI * 2);
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                    this.ctx.fill();
+                    
+                    // 随机闪烁效果
+                    if (Math.random() < 0.15) {
+                        this.drawSparkle(
+                            star.x + (Math.random()-0.5)*15,
+                            star.y + (Math.random()-0.5)*15,
+                            3 + Math.random()*4,
+                            0.8 + Math.random()*0.6
+                        );
+                    }
+                    
+                    // 如果正在闪光
+                    if (star._sparkleTimer > 0) {
+                        star._sparkleTimer--;
+                        const sparkleAlpha = star._sparkleTimer / 15;
+                        this.drawSparkle(star.x, star.y, 25, sparkleAlpha * (star._sparkle || 1));
+                    }
+                    
+                    // 恢复状态
+                    this.ctx.restore();
+                }
+
+                this.ctx.globalCompositeOperation = 'source-over';
                 
-                this.ctx.beginPath();
-                this.ctx.arc(screenX, screenY, ornament.currentSize / 2, 0, Math.PI * 2);
-                this.ctx.fillStyle = ornament.color;
-                this.ctx.fill();
-                
-                // 光晕效果
-                const glowSize = ornament.currentSize * 1.5;
-                const glowColor = this.adjustBrightness(ornament.color, 1.3);
-                
-                this.ctx.beginPath();
-                this.ctx.arc(screenX, screenY, glowSize * 0.3 / 2, 0, Math.PI * 2);
-                this.ctx.fillStyle = glowColor;
-                this.ctx.globalAlpha = 0.5;
-                this.ctx.fill();
+                // 绘制雪花
+                this.snowflakes.forEach(s => {
+                    // 检查雪花是否在星星附近
+                    if (this.topStar) {
+                        const dx = s.x - this.topStar.x;
+                        const dy = s.y - this.topStar.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        // 如果雪花在星星附近，跳过绘制
+                        if (distance < 60) {
+                            return;
+                        }
+                    }
+                    
+                    switch(s.type) {
+                        case 0:
+                            this.drawHexagonSnowflake(s.x, s.y, s.size, s.rotation, s.opacity);
+                            break;
+                        case 1:
+                            this.drawStarSnowflake(s.x, s.y, s.size, s.rotation, s.opacity);
+                            break;
+                        case 2:
+                            this.drawFlowerSnowflake(s.x, s.y, s.size, s.rotation, s.opacity);
+                            break;
+                    }
+                });
+
                 this.ctx.globalAlpha = 1.0;
             }
 
-            drawTwinkleLight(light) {
-                const screenX = light.x + this.centerX;
-                const screenY = this.centerY - light.y; // 注意：这里需要反转Y轴
-                
-                this.ctx.beginPath();
-                this.ctx.arc(screenX, screenY, light.currentSize / 2, 0, Math.PI * 2);
-                this.ctx.fillStyle = light.color;
-                this.ctx.fill();
-            }
-
-            adjustBrightness(color, factor) {
-                if (color.startsWith("rgb")) {
-                    const rgb = color.match(/\d+/g);
-                    let r = Math.min(255, Math.floor(rgb[0] * factor));
-                    let g = Math.min(255, Math.floor(rgb[1] * factor));
-                    let b = Math.min(255, Math.floor(rgb[2] * factor));
-                    return `rgb(${r}, ${g}, ${b})`;
-                } else if (color.startsWith("#")) {
-                    let r = parseInt(color.substr(1, 2), 16);
-                    let g = parseInt(color.substr(3, 2), 16);
-                    let b = parseInt(color.substr(5, 2), 16);
-                    r = Math.min(255, Math.floor(r * factor));
-                    g = Math.min(255, Math.floor(g * factor));
-                    b = Math.min(255, Math.floor(b * factor));
-                    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-                }
-                return color;
-            }
-
-            animate() {
-                this.ctx.clearRect(0, 0, this.screenWidth, this.screenHeight);
-                
-                // 更新所有元素
-                this.updateParticles();
-                this.updateSnowflakes();
-                this.updateMeteors();
-                this.updateOrnaments();
-                this.updateTwinkleLights();
-                this.updateText(); // 更新文字
-                
-                // 绘制所有元素（按正确的层级顺序）
-                for (let snowflake of this.snowflakes) {
-                    this.drawSnowflake(snowflake);
-                }
-                
-                for (let particle of this.tree.glowParticles) {
-                    this.drawParticle(particle);
-                }
-                
-                for (let particle of this.tree.particles) {
-                    this.drawParticle(particle);
-                }
-                
-                for (let particle of this.tree.decorationParticles) {
-                    this.drawParticle(particle);
-                }
-                
-                for (let particle of this.tree.treeTipParticles) {
-                    this.drawParticle(particle);
-                }
-                
-                for (let particle of this.tree.starParticles) {
-                    this.drawParticle(particle);
-                }
-                
-                for (let particle of this.tree.treeTopParticles) {
-                    this.drawParticle(particle);
-                }
-                
-                for (let particle of this.tree.groundParticles) {
-                    this.drawParticle(particle);
-                }
-                
-                for (let ornament of this.ornaments) {
-                    this.drawOrnament(ornament);
-                }
-                
-                for (let light of this.twinkleLights) {
-                    this.drawTwinkleLight(light);
-                }
-                
-                for (let meteor of this.meteors) {
-                    this.drawMeteor(meteor);
-                }
-                
-                requestAnimationFrame(() => this.animate());
-            }
-
             startAnimation() {
-                this.animate();
+                const animate = () => {
+                    this.update();
+                    this.draw();
+                    requestAnimationFrame(animate);
+                };
+                animate();
             }
         }
 
-        // 启动动画
-        window.addEventListener('load', () => {
-            new ChristmasAnimation();
-        });
-
-        // 处理窗口大小变化
-        window.addEventListener('resize', () => {
-            location.reload();
-        });
+        window.addEventListener('load', () => new ChristmasAnimation());
     </script>
 </body>
 </html>
