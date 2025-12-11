@@ -6,25 +6,50 @@
     <title>Merry Christmas from Zhou</title>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* 隐藏滚动条 */
+            overscroll-behavior: none; /* 防止滚动反弹 */
+            -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+        }
         
         body {
             background: radial-gradient(circle at center, #1a1a3a 0%, #03030c 100%);
-            overflow: hidden;
             font-family: 'Great Vibes', cursive;
+            position: fixed; /* 固定定位防止滚动 */
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
         
         #canvasContainer {
-            position: relative;
+            position: fixed; /* 改为固定定位 */
+            top: 0;
+            left: 0;
             width: 100vw;
             height: 100vh;
+            z-index: 1;
         }
         
-        canvas { display: block; }
+        canvas { 
+            display: block; 
+            position: fixed; /* 确保canvas固定 */
+            top: 0;
+            left: 0;
+        }
         
         #loading {
-            position: absolute;
-            top: 50%; left: 50%;
+            position: fixed; /* 固定定位 */
+            top: 50%; 
+            left: 50%;
             transform: translate(-50%, -50%);
             color: #4ECDC4;
             font-size: 20px;
@@ -34,7 +59,7 @@
         }
 
         #textContainer {
-            position: absolute;
+            position: fixed; /* 固定定位 */
             bottom: 4%; 
             left: 0;
             width: 100%;
@@ -100,7 +125,7 @@
 <body>
     <div id="canvasContainer">
         <canvas id="christmasCanvas"></canvas>
-        <div id="loading"></div>
+        <div id="loading">加载圣诞祝福...</div>
         <div id="textContainer">
             <div id="mainText">Merry Christmas🎄</div>
         </div>
@@ -121,6 +146,9 @@
                 this.addEventListeners();
                 this.createScene();
                 this.startAnimation();
+                
+                // 防止页面滚动
+                this.preventScroll();
             }
 
             setupCanvas() {
@@ -144,19 +172,65 @@
                 
                 setTimeout(() => {
                     this.loading.style.opacity = 0;
-                    setTimeout(() => this.loading.style.display = 'none', 500);
+                    setTimeout(() => {
+                        this.loading.style.display = 'none';
+                    }, 500);
                 }, 300);
             }
 
+            preventScroll() {
+                // 阻止所有可能引起滚动的事件
+                document.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                }, { passive: false });
+                
+                document.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                }, { passive: false });
+                
+                // 阻止键盘滚动
+                document.addEventListener('keydown', (e) => {
+                    if ([32, 37, 38, 39, 40].includes(e.keyCode)) {
+                        e.preventDefault();
+                    }
+                });
+            }
+
             addEventListeners() {
+                // 窗口大小变化时重新设置画布
+                let resizeTimeout;
                 window.addEventListener('resize', () => {
-                    this.setupCanvas();
-                    this.createScene(); 
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(() => {
+                        this.setupCanvas();
+                        this.createScene();
+                    }, 100);
                 });
 
+                // 鼠标移动
                 window.addEventListener('mousemove', (e) => {
                     this.targetMouse.x = (e.clientX - this.centerX) / this.centerX;
                     this.targetMouse.y = (e.clientY - this.centerY) / this.centerY;
+                });
+                
+                // 触摸移动
+                window.addEventListener('touchmove', (e) => {
+                    if (e.touches.length > 0) {
+                        const touch = e.touches[0];
+                        this.targetMouse.x = (touch.clientX - this.centerX) / this.centerX;
+                        this.targetMouse.y = (touch.clientY - this.centerY) / this.centerY;
+                    }
+                });
+
+                // 全屏功能（可选）
+                document.addEventListener('click', () => {
+                    if (document.documentElement.requestFullscreen) {
+                        document.documentElement.requestFullscreen();
+                    } else if (document.documentElement.webkitRequestFullscreen) {
+                        document.documentElement.webkitRequestFullscreen();
+                    } else if (document.documentElement.msRequestFullscreen) {
+                        document.documentElement.msRequestFullscreen();
+                    }
                 });
             }
 
@@ -746,7 +820,22 @@
             }
         }
 
-        window.addEventListener('load', () => new ChristmasAnimation());
+        // 页面加载完成后启动动画
+        window.addEventListener('load', () => {
+            // 确保页面不滚动
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+            
+            // 启动动画
+            new ChristmasAnimation();
+        });
+
+        // 防止iOS Safari工具栏影响布局
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                window.scrollTo(0, 0);
+            }, 100);
+        });
     </script>
 </body>
 </html>
