@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Merry Christmas from Zhou</title>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
@@ -10,28 +10,33 @@
             margin: 0; 
             padding: 0; 
             box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent;
         }
         
         html, body {
             width: 100%;
             height: 100%;
-            overflow: hidden; /* 隐藏滚动条 */
-            overscroll-behavior: none; /* 防止滚动反弹 */
-            -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+            overflow: hidden;
+            overscroll-behavior: none;
         }
         
         body {
             background: radial-gradient(circle at center, #1a1a3a 0%, #03030c 100%);
             font-family: 'Great Vibes', cursive;
-            position: fixed; /* 固定定位防止滚动 */
+            position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            cursor: pointer; /* 添加点击光标提示 */
         }
         
         #canvasContainer {
-            position: fixed; /* 改为固定定位 */
+            position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
@@ -41,13 +46,13 @@
         
         canvas { 
             display: block; 
-            position: fixed; /* 确保canvas固定 */
+            position: fixed;
             top: 0;
             left: 0;
         }
         
         #loading {
-            position: fixed; /* 固定定位 */
+            position: fixed;
             top: 50%; 
             left: 50%;
             transform: translate(-50%, -50%);
@@ -59,8 +64,8 @@
         }
 
         #textContainer {
-            position: fixed; /* 固定定位 */
-            bottom: 4%; 
+            position: fixed;
+            bottom: 3%; 
             left: 0;
             width: 100%;
             text-align: center;
@@ -120,6 +125,58 @@
                 textFloatIn 2s ease-out forwards 1s,
                 textGlow 3s ease-in-out infinite 3s;
         }
+
+        /* 点击提示样式 */
+        .tap-hint {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 215, 0, 0.8);
+            font-size: 18px;
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            z-index: 5;
+            animation: pulseHint 2s ease-in-out infinite;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        @keyframes pulseHint {
+            0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+        }
+
+        /* 移动设备响应式调整 */
+        @media screen and (max-height: 500px) {
+            #mainText {
+                font-size: clamp(36px, 5vw, 48px) !important;
+                bottom: 2% !important;
+            }
+            
+            #textContainer {
+                bottom: 1% !important;
+            }
+            
+            .tap-hint {
+                font-size: 16px;
+                top: 20px;
+                transform: translateX(-50%);
+            }
+        }
+
+        /* 横屏模式优化 */
+        @media screen and (orientation: landscape) and (max-height: 500px) {
+            #mainText {
+                font-size: clamp(32px, 4vw, 40px) !important;
+            }
+        }
+
+        /* 全屏模式优化 */
+        :fullscreen, ::backdrop {
+            background-color: transparent;
+        }
     </style>
 </head>
 <body>
@@ -129,57 +186,183 @@
         <div id="textContainer">
             <div id="mainText">Merry Christmas🎄</div>
         </div>
+        <div class="tap-hint" id="tapHint"></div>
     </div>
 
     <script>
+        // 全屏功能函数
+        function requestFullscreen() {
+            const elem = document.documentElement;
+            
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) { /* Safari */
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) { /* IE11 */
+                elem.msRequestFullscreen();
+            }
+        }
+
+        function exitFullscreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) { /* Safari */
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) { /* IE11 */
+                document.msExitFullscreen();
+            }
+        }
+
+        function toggleFullscreen() {
+            const isFullscreen = document.fullscreenElement || 
+                                document.webkitFullscreenElement || 
+                                document.msFullscreenElement;
+            
+            if (!isFullscreen) {
+                requestFullscreen();
+            } else {
+                exitFullscreen();
+            }
+        }
+
+        // 显示点击提示
+        function showTapHint() {
+            const tapHint = document.getElementById('tapHint');
+            setTimeout(() => {
+                tapHint.style.opacity = '1';
+            }, 3000);
+            
+            // 5秒后自动隐藏
+            setTimeout(() => {
+                tapHint.style.opacity = '0';
+            }, 8000);
+        }
+
         class ChristmasAnimation {
             constructor() {
                 this.canvas = document.getElementById('christmasCanvas');
                 this.ctx = this.canvas.getContext('2d');
                 this.loading = document.getElementById('loading');
+                this.resizeTimeout = null;
+                this.isFullscreen = false;
                 
-                this.mouse = { x: 0, y: 0 };
-                this.targetMouse = { x: 0, y: 0 };
+                // 移除鼠标交互，改为自动旋转
+                this.autoRotation = 0;
+                this.rotationSpeed = 0.005; // 自动旋转速度
+                this.growthProgress = 0; // 生长进度
+                this.maxGrowth = 1; // 最大生长值
                 
                 this.setupCanvas();
                 this.initColors();
-                this.addEventListeners();
                 this.createScene();
                 this.startAnimation();
                 
-                // 防止页面滚动
                 this.preventScroll();
+                
+                // 添加窗口大小调整监听
+                window.addEventListener('resize', () => this.handleResize());
+                
+                // 显示点击提示
+                showTapHint();
+                
+                // 监听全屏变化
+                this.setupFullscreenListeners();
             }
 
             setupCanvas() {
-                this.dpr = window.devicePixelRatio || 1;
-                this.screenWidth = window.innerWidth;
-                this.screenHeight = window.innerHeight;
+                // 获取更准确的屏幕尺寸
+                const getScreenDimensions = () => {
+                    return {
+                        width: Math.max(document.documentElement.clientWidth, window.innerWidth || 0),
+                        height: Math.max(document.documentElement.clientHeight, window.innerHeight || 0)
+                    };
+                };
                 
+                const { width, height } = getScreenDimensions();
+                
+                this.dpr = Math.min(window.devicePixelRatio || 1, 2); // 限制最大DPI缩放
+                this.screenWidth = width;
+                this.screenHeight = height;
+                
+                // 设置画布尺寸
                 this.canvas.width = this.screenWidth * this.dpr;
                 this.canvas.height = this.screenHeight * this.dpr;
-                this.canvas.style.width = this.screenWidth + 'px';
-                this.canvas.style.height = this.screenHeight + 'px';
+                this.canvas.style.width = `${this.screenWidth}px`;
+                this.canvas.style.height = `${this.screenHeight}px`;
                 
+                // 重置变换矩阵
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
                 this.ctx.scale(this.dpr, this.dpr);
                 
                 this.centerX = this.screenWidth / 2;
                 this.centerY = this.screenHeight / 2;
                 
-                this.treeBaseY = this.screenHeight * 0.7; 
+                // 树干位置保持不变
+                this.trunkBaseY = this.screenHeight * 0.7; 
                 
-                this.treeScale = Math.min(this.screenWidth, this.screenHeight) / 1000;
+                // 树冠基准点向下移动
+                this.crownBaseY = this.screenHeight * 0.82; 
                 
+                // 增大树的比例因子，从800改为850，使整体略小一点
+                this.treeScale = Math.min(this.screenWidth, this.screenHeight) / 850;
+                
+                // 隐藏加载提示
                 setTimeout(() => {
                     this.loading.style.opacity = 0;
                     setTimeout(() => {
                         this.loading.style.display = 'none';
                     }, 500);
-                }, 300);
+                }, 1500);
+            }
+
+            setupFullscreenListeners() {
+                // 点击屏幕切换全屏
+                document.addEventListener('click', () => {
+                    toggleFullscreen();
+                    // 隐藏点击提示
+                    document.getElementById('tapHint').style.opacity = '0';
+                });
+                
+                // 监听全屏变化
+                document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
+                document.addEventListener('webkitfullscreenchange', () => this.handleFullscreenChange());
+                document.addEventListener('msfullscreenchange', () => this.handleFullscreenChange());
+                
+                // 添加键盘快捷键支持（按F键进入/退出全屏）
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'f' || e.key === 'F') {
+                        toggleFullscreen();
+                        e.preventDefault();
+                    }
+                });
+            }
+
+            handleFullscreenChange() {
+                this.isFullscreen = !!(document.fullscreenElement || 
+                                      document.webkitFullscreenElement || 
+                                      document.msFullscreenElement);
+                
+                // 全屏状态变化后重新调整画布
+                setTimeout(() => {
+                    this.handleResize();
+                }, 100);
+            }
+
+            handleResize() {
+                // 防抖处理，避免频繁重绘
+                if (this.resizeTimeout) {
+                    clearTimeout(this.resizeTimeout);
+                }
+                
+                this.resizeTimeout = setTimeout(() => {
+                    this.setupCanvas();
+                    this.createScene();
+                    // 确保画布尺寸正确
+                    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+                }, 250);
             }
 
             preventScroll() {
-                // 阻止所有可能引起滚动的事件
                 document.addEventListener('touchmove', (e) => {
                     e.preventDefault();
                 }, { passive: false });
@@ -188,7 +371,6 @@
                     e.preventDefault();
                 }, { passive: false });
                 
-                // 阻止键盘滚动
                 document.addEventListener('keydown', (e) => {
                     if ([32, 37, 38, 39, 40].includes(e.keyCode)) {
                         e.preventDefault();
@@ -196,48 +378,26 @@
                 });
             }
 
-            addEventListeners() {
-                // 窗口大小变化时重新设置画布
-                let resizeTimeout;
-                window.addEventListener('resize', () => {
-                    clearTimeout(resizeTimeout);
-                    resizeTimeout = setTimeout(() => {
-                        this.setupCanvas();
-                        this.createScene();
-                    }, 100);
-                });
-
-                // 鼠标移动
-                window.addEventListener('mousemove', (e) => {
-                    this.targetMouse.x = (e.clientX - this.centerX) / this.centerX;
-                    this.targetMouse.y = (e.clientY - this.centerY) / this.centerY;
-                });
-                
-                // 触摸移动
-                window.addEventListener('touchmove', (e) => {
-                    if (e.touches.length > 0) {
-                        const touch = e.touches[0];
-                        this.targetMouse.x = (touch.clientX - this.centerX) / this.centerX;
-                        this.targetMouse.y = (touch.clientY - this.centerY) / this.centerY;
-                    }
-                });
-
-                // 全屏功能（可选）
-                document.addEventListener('click', () => {
-                    if (document.documentElement.requestFullscreen) {
-                        document.documentElement.requestFullscreen();
-                    } else if (document.documentElement.webkitRequestFullscreen) {
-                        document.documentElement.webkitRequestFullscreen();
-                    } else if (document.documentElement.msRequestFullscreen) {
-                        document.documentElement.msRequestFullscreen();
-                    }
-                });
-            }
-
             initColors() {
                 this.TREE_COLORS = ["#2E8B57", "#3CB371", "#20B2AA", "#66CDAA", "#00FA9A"];
                 this.LIGHT_COLORS = ["#FF6B9D", "#FFD166", "#7CE6E6", "#FF8AF0", "#FFA552", "#93FF9B"];
-                this.TRUNK_COLORS = ["#5C3317", "#6F4E37", "#8B4513"]; 
+                this.TRUNK_COLORS = ["#5C3317", "#6F4E37", "#8B4513"];
+                // 礼盒颜色
+                this.GIFT_COLORS = [
+                    { box: "#FF6B6B", ribbon: "#FFD166" },
+                    { box: "#4ECDC4", ribbon: "#FFE66D" },
+                    { box: "#95E1D3", ribbon: "#F38181" },
+                    { box: "#FF8AF0", ribbon: "#7CE6E6" },
+                    { box: "#FFD166", ribbon: "#FF6B9D" },
+                    { box: "#A8E6CF", ribbon: "#FFAAA5" },
+                    { box: "#FFD3B6", ribbon: "#A8E6CF" },
+                    { box: "#D4A5A5", ribbon: "#FFE8E8" },
+                ];
+                // 螺旋灯带颜色
+                this.SPIRAL_LIGHT_COLORS = [
+                    "#FF6B9D", "#FFD166", "#7CE6E6", "#FF8AF0", 
+                    "#4ECDC4", "#95E1D3", "#A8E6CF", "#FFD3B6"
+                ];
             }
 
             createScene() {
@@ -246,19 +406,40 @@
                 this.snowflakes = [];
                 this.stars = [];     
                 this.topStar = null;
+                this.gifts = [];     
+                this.upperGifts = []; 
+                this.topGifts = [];   // 新增：顶部礼盒
+                this.spiralLights = [];
 
-                this.createChristmasTree();
+                // 创建圣诞树（树干部分）
+                this.createChristmasTreeTrunk();
+                
+                // 创建圣诞树（树冠部分）
+                this.createChristmasTreeCrown();
+                
+                // 创建雪花（减小尺寸）
                 this.createSnowflakes();
+                
+                // 创建顶部星星
                 this.createTopStar();
+                
+                // 创建礼盒
+                this.createTopGifts();    // 先创建顶部礼盒
+                this.createUpperGifts();  // 然后创建上部礼盒
+                this.createGifts();       // 最后创建中部礼盒
+                
+                // 创建螺旋灯带
+                this.createSpiralLights();
             }
 
-            createChristmasTree() {
-                const trunkHeight = 150 * this.treeScale;
-                const trunkRadius = 40 * this.treeScale;
-                const trunkCount = 800;
+            createChristmasTreeTrunk() {
+                const trunkHeight = 140 * this.treeScale; // 增加树干高度
+                const trunkRadius = 50 * this.treeScale; // 增加树干半径
+                const trunkCount = 1000; // 增加树干粒子数量
+                
                 for (let i = 0; i < trunkCount; i++) {
                     const p = i / trunkCount;
-                    const y = this.treeBaseY + p * trunkHeight;
+                    const y = this.trunkBaseY + p * trunkHeight;
                     const angle = i * 2.39996;
                     const currentRadius = trunkRadius * (1 - 0.2 * p);
                     const r = currentRadius * Math.sqrt(Math.random()) * (0.5 + Math.random() * 0.5);
@@ -267,7 +448,7 @@
                     let color;
                     if (z > 0) {
                         color = this.TRUNK_COLORS[2];
-                    } else if (y > this.treeBaseY + trunkHeight * 0.6) {
+                    } else if (y > this.trunkBaseY + trunkHeight * 0.6) {
                         color = this.TRUNK_COLORS[0];
                     } else {
                         color = this.TRUNK_COLORS[1];
@@ -276,38 +457,46 @@
                         x: x, y: y, z: z,
                         baseX: x, baseY: y,
                         color: color,
-                        size: Math.random() * 3 + 3,
+                        size: Math.random() * 3.5 + 3, // 调整粒子尺寸
                         swaySpeed: 0,
                         swayOffset: 0,
-                        isTrunk: true
+                        isTrunk: true,
+                        growth: 1
                     });
                 }
+            }
 
-                const particleCount = 2000; 
-                const treeHeight = 550 * this.treeScale; 
-                const maxRadius = 240 * this.treeScale;
+            createChristmasTreeCrown() {
+                const particleCount = 3500; // 增加粒子数量
+                const treeHeight = 620 * this.treeScale; // 增加树冠高度
+                const maxRadius = 280 * this.treeScale; // 增加最大半径
+                
+                // 旋转式增长：螺旋角度
+                const spiralFactor = 10; // 螺旋系数，值越大螺旋越紧密
                 
                 for (let i = 0; i < particleCount; i++) {
                     const p = i / particleCount; 
-                    const angle = i * 2.39996; 
+                    
+                    // 添加螺旋效果
+                    const spiralAngle = i * 2.39996 + p * spiralFactor;
                     
                     const currentHeight = treeHeight * p;
                     const currentRadius = maxRadius * (1 - p);
                     
                     const r = currentRadius * Math.sqrt(Math.random()) * (0.8 + Math.random() * 0.4);
                     
-                    const x = Math.cos(angle) * r;
-                    const y = this.treeBaseY - currentHeight; 
-                    const z = Math.sin(angle) * r;
+                    const x = Math.cos(spiralAngle) * r;
+                    const y = this.crownBaseY - currentHeight; // 使用树冠基准点
+                    const z = Math.sin(spiralAngle) * r;
 
                     if (Math.random() < 0.18) {
                         const color = this.LIGHT_COLORS[Math.floor(Math.random() * this.LIGHT_COLORS.length)];
-                        const size = Math.random() * 3 + 2;
+                        const size = Math.random() * 3.5 + 2.5; // 调整灯光尺寸
                         const pulseSpeed = 1.0 + Math.random() * 3.5;
                         const phase = Math.random() * Math.PI * 2;
                         const baseAlpha = 0.5 + Math.random() * 0.6;
                         const sparkleChance = Math.random() < 0.15 ? 0.01 + Math.random()*0.03 : 0;
-                        const glow = 8 + Math.random() * 24;
+                        const glow = 8 + Math.random() * 24; // 调整发光范围
                         this.lights.push({
                             x: x, y: y, z: z,
                             baseX: x, baseY: y,
@@ -318,57 +507,273 @@
                             baseAlpha: baseAlpha,
                             sparkleChance: sparkleChance,
                             glow: glow,
-                            flickerSeed: Math.random() * 1000
+                            flickerSeed: Math.random() * 1000,
+                            growth: 1,
+                            spiralAngle: spiralAngle
                         });
                     } else {
                         this.particles.push({
                             x: x, y: y, z: z,
                             baseX: x, baseY: y,
                             color: this.TREE_COLORS[Math.floor(Math.random() * this.TREE_COLORS.length)],
-                            size: Math.random() * 1.5 + 0.5,
+                            size: Math.random() * 1.8 + 0.6, // 调整枝叶粒子尺寸
                             swaySpeed: Math.random() * 2 + 1,
                             swayOffset: Math.random() * Math.PI * 2,
-                            isTrunk: false
+                            isTrunk: false,
+                            growth: 1,
+                            spiralAngle: spiralAngle
                         });
                     }
                 }
             }
 
-            createTopStar() {
-                const treeHeight = 550 * this.treeScale;
-                const topY = this.treeBaseY - treeHeight; 
+            createTopGifts() {
+                const treeHeight = 620 * this.treeScale; // 调整树高
+                const maxRadius = 280 * this.treeScale; // 增加最大半径
+                const topGiftCount = 5; // 增加顶部礼盒数量
+                const spiralFactor = 12; // 螺旋系数较大，形成更紧密的螺旋
                 
-                // 修正星星参数
+                for (let i = 0; i < topGiftCount; i++) {
+                    // 顶部礼盒位置：非常靠近树的顶部，在星星下方
+                    const heightRatio = 0.05 + Math.random() * 0.08; // 0.05-0.13，非常靠上
+                    const currentHeight = treeHeight * heightRatio;
+                    const y = this.crownBaseY - currentHeight; // 使用树冠基准点
+                    
+                    // 顶部礼盒半径较小，紧贴树顶
+                    const radiusRatio = 0.3 + Math.random() * 0.3; // 0.3-0.6
+                    const currentRadius = maxRadius * (1 - heightRatio) * radiusRatio;
+                    
+                    // 添加螺旋效果
+                    const spiralAngle = i * (Math.PI * 2 / topGiftCount) + heightRatio * spiralFactor;
+                    
+                    const x = Math.cos(spiralAngle) * currentRadius;
+                    const z = Math.sin(spiralAngle) * currentRadius;
+                    
+                    // 选择特殊的礼盒颜色，让顶部礼盒更显眼
+                    const specialColors = [
+                        { box: "#FF6B6B", ribbon: "#FFD166" }, // 红色+金色
+                        { box: "#4ECDC4", ribbon: "#FFE66D" }, // 青色+黄色
+                        { box: "#FF8AF0", ribbon: "#7CE6E6" }, // 粉色+青色
+                        { box: "#FFD166", ribbon: "#FF6B9D" }, // 金色+粉色
+                        { box: "#A8E6CF", ribbon: "#FFAAA5" }  // 浅绿+粉色
+                    ];
+                    const colorSet = specialColors[i % specialColors.length];
+                    
+                    // 顶部礼盒较大，更显眼
+                    const size = (0.45 + Math.random() * 0.45) * this.treeScale * 25; // 调整礼盒尺寸
+                    
+                    const rotation = Math.random() * Math.PI * 2;
+                    const rotationSpeed = (Math.random() - 0.5) * 0.015; // 旋转速度较快
+                    const swaySpeed = 0.8 + Math.random() * 1.5; // 摆动较快
+                    const swayOffset = Math.random() * Math.PI * 2;
+                    
+                    this.topGifts.push({
+                        x: x, y: y, z: z,
+                        baseX: x, baseY: y,
+                        color: colorSet.box,
+                        ribbonColor: colorSet.ribbon,
+                        size: size,
+                        rotation: rotation,
+                        rotationSpeed: rotationSpeed,
+                        swaySpeed: swaySpeed,
+                        swayOffset: swayOffset,
+                        timeOffset: Math.random() * 1000,
+                        glow: 0,
+                        sparkleTimer: 0,
+                        sparkleIntensity: 0,
+                        growth: 1,
+                        spiralAngle: spiralAngle,
+                        layer: "top", // 标记为顶层礼盒
+                        floatHeight: 5 + Math.random() * 10, // 浮动高度
+                        floatSpeed: 1 + Math.random() * 2    // 浮动速度
+                    });
+                }
+            }
+
+            createUpperGifts() {
+                const treeHeight = 620 * this.treeScale; // 调整树高
+                const maxRadius = 280 * this.treeScale; // 增加最大半径
+                const upperGiftCount = 8; // 增加上部礼盒数量
+                const spiralFactor = 8;
+                
+                for (let i = 0; i < upperGiftCount; i++) {
+                    // 礼盒位置：树的上部区域
+                    const heightRatio = 0.15 + Math.random() * 0.2; // 0.15-0.35
+                    const currentHeight = treeHeight * heightRatio;
+                    const y = this.crownBaseY - currentHeight; // 使用树冠基准点
+                    
+                    const radiusRatio = 0.6 + Math.random() * 0.3; // 0.6-0.9
+                    const currentRadius = maxRadius * (1 - heightRatio) * radiusRatio;
+                    
+                    // 添加螺旋效果
+                    const spiralAngle = i * (Math.PI * 2 / upperGiftCount) + heightRatio * spiralFactor;
+                    
+                    const x = Math.cos(spiralAngle) * currentRadius;
+                    const z = Math.sin(spiralAngle) * currentRadius;
+                    
+                    const colorSet = this.GIFT_COLORS[Math.floor(Math.random() * this.GIFT_COLORS.length)];
+                    
+                    const size = (0.65 + Math.random() * 0.65) * this.treeScale * 28; // 调整礼盒尺寸
+                    
+                    const rotation = Math.random() * Math.PI * 2;
+                    const rotationSpeed = (Math.random() - 0.5) * 0.012;
+                    const swaySpeed = 0.6 + Math.random() * 1.2;
+                    const swayOffset = Math.random() * Math.PI * 2;
+                    
+                    this.upperGifts.push({
+                        x: x, y: y, z: z,
+                        baseX: x, baseY: y,
+                        color: colorSet.box,
+                        ribbonColor: colorSet.ribbon,
+                        size: size,
+                        rotation: rotation,
+                        rotationSpeed: rotationSpeed,
+                        swaySpeed: swaySpeed,
+                        swayOffset: swayOffset,
+                        timeOffset: Math.random() * 1000,
+                        glow: 0,
+                        sparkleTimer: 0,
+                        sparkleIntensity: 0,
+                        growth: 1,
+                        spiralAngle: spiralAngle,
+                        layer: "upper"
+                    });
+                }
+            }
+
+            createGifts() {
+                const treeHeight = 620 * this.treeScale; // 调整树高
+                const maxRadius = 280 * this.treeScale; // 增加最大半径
+                const giftCount = 6; // 增加中部礼盒数量
+                const spiralFactor = 8;
+                
+                for (let i = 0; i < giftCount; i++) {
+                    const heightRatio = 0.3 + Math.random() * 0.2; // 0.3-0.5
+                    const currentHeight = treeHeight * heightRatio;
+                    const y = this.crownBaseY - currentHeight; // 使用树冠基准点
+                    
+                    const radiusRatio = 0.5 + Math.random() * 0.4; // 0.5-0.9
+                    const currentRadius = maxRadius * (1 - heightRatio) * radiusRatio;
+                    
+                    const spiralAngle = i * (Math.PI * 2 / giftCount) + heightRatio * spiralFactor;
+                    
+                    const x = Math.cos(spiralAngle) * currentRadius;
+                    const z = Math.sin(spiralAngle) * currentRadius;
+                    
+                    const colorSet = this.GIFT_COLORS[Math.floor(Math.random() * this.GIFT_COLORS.length)];
+                    
+                    const size = (0.75 + Math.random() * 0.75) * this.treeScale * 30; // 调整礼盒尺寸
+                    
+                    const rotation = Math.random() * Math.PI * 2;
+                    const rotationSpeed = (Math.random() - 0.5) * 0.01;
+                    const swaySpeed = 0.5 + Math.random() * 1.0;
+                    const swayOffset = Math.random() * Math.PI * 2;
+                    
+                    this.gifts.push({
+                        x: x, y: y, z: z,
+                        baseX: x, baseY: y,
+                        color: colorSet.box,
+                        ribbonColor: colorSet.ribbon,
+                        size: size,
+                        rotation: rotation,
+                        rotationSpeed: rotationSpeed,
+                        swaySpeed: swaySpeed,
+                        swayOffset: swayOffset,
+                        timeOffset: Math.random() * 1000,
+                        glow: 0,
+                        sparkleTimer: 0,
+                        sparkleIntensity: 0,
+                        growth: 1,
+                        spiralAngle: spiralAngle,
+                        layer: "middle"
+                    });
+                }
+            }
+
+            createSpiralLights() {
+                const treeHeight = 620 * this.treeScale; // 调整树高
+                const maxRadius = 280 * this.treeScale; // 增加最大半径
+                const spiralCount = 100; // 增加螺旋灯带数量
+                const spiralTurns = 5;
+                
+                for (let i = 0; i < spiralCount; i++) {
+                    const t = i / spiralCount;
+                    const currentHeight = treeHeight * t;
+                    const y = this.crownBaseY - currentHeight; // 使用树冠基准点
+                    
+                    const angle = t * Math.PI * 2 * spiralTurns + t * 10;
+                    
+                    const currentRadius = maxRadius * (1 - t * 0.8) * (0.7 + Math.random() * 0.3);
+                    
+                    const x = Math.cos(angle) * currentRadius;
+                    const z = Math.sin(angle) * currentRadius;
+                    
+                    const color = this.SPIRAL_LIGHT_COLORS[i % this.SPIRAL_LIGHT_COLORS.length];
+                    
+                    const size = 1.8 + Math.random() * 1.8; // 调整灯带尺寸
+                    const pulseSpeed = 2.0 + Math.random() * 2.0;
+                    const phase = Math.random() * Math.PI * 2;
+                    const baseAlpha = 0.6 + Math.random() * 0.4;
+                    const glow = 10 + Math.random() * 20; // 调整发光范围
+                    
+                    this.spiralLights.push({
+                        x: x, y: y, z: z,
+                        baseX: x, baseY: y,
+                        color: color,
+                        size: size,
+                        pulseSpeed: pulseSpeed,
+                        phase: phase,
+                        baseAlpha: baseAlpha,
+                        glow: glow,
+                        flickerSeed: Math.random() * 1000,
+                        trailLength: 3 + Math.floor(Math.random() * 4),
+                        trailOffset: 0,
+                        growth: 1,
+                        spiralAngle: angle
+                    });
+                }
+            }
+
+            createTopStar() {
+                const treeHeight = 620 * this.treeScale; // 调整树高
+                const topY = this.crownBaseY - treeHeight; // 使用树冠基准点
+                
                 this.topStar = {
                     x: this.centerX,
-                    y: topY - 15, // 稍微向上调整
-                    size: 24 * this.treeScale, // 调整大小
+                    y: topY - 30, // 将星星再上移一些，为顶部礼盒腾出更多空间
+                    size: 30 * this.treeScale, // 调整星星尺寸
                     color: '#FFD700',
                     rotation: 0,
+                    rotationSpeed: 0.01,
                     pulseSpeed: 0.8,
-                    glowSize: 40 * this.treeScale,
+                    glowSize: 48 * this.treeScale, // 调整星星发光范围
                     spikes: 5,
-                    innerRadius: 0.4, // 调整内半径比例，让星星更明显
+                    innerRadius: 0.4,
                     outerRadius: 1,
                     time: 0,
-                    sparkleInterval: 0
+                    sparkleInterval: 0,
+                    growth: 1
                 };
             }
 
             createSnowflakes() {
-                for (let i = 0; i < 300; i++) {
+                for (let i = 0; i < 500; i++) { // 增加雪花数量
                     this.snowflakes.push({
                         x: Math.random() * this.screenWidth,
                         y: Math.random() * this.screenHeight,
-                        z: Math.random() * 2 + 0.5, 
-                        size: Math.random() * 3 + 2,
+                        z: Math.random() * 2 + 0.5,
+                        size: Math.random() * 4 + 3, // 减小雪花尺寸
+                        baseSize: Math.random() * 4 + 3,
                         speedY: Math.random() * 1 + 0.5,
                         swayAmp: Math.random() * 2,
                         swayFreq: Math.random() * 0.02,
                         opacity: Math.random() * 0.6 + 0.3,
                         rotation: Math.random() * Math.PI * 2,
-                        rotationSpeed: (Math.random() - 0.5) * 0.03,
-                        type: Math.floor(Math.random() * 3)
+                        rotationSpeed: (Math.random() - 0.5) * 0.05,
+                        type: Math.floor(Math.random() * 3),
+                        growth: 0,
+                        targetSize: Math.random() * 1.8 + 1,
+                        growthSpeed: Math.random() * 0.003 + 0.001
                     });
                 }
             }
@@ -380,43 +785,55 @@
             update() {
                 const time = Date.now() / 1000;
                 
-                this.mouse.x += (this.targetMouse.x - this.mouse.x) * 0.05;
-                this.mouse.y += (this.targetMouse.y - this.mouse.y) * 0.05;
-
+                // 自动旋转
+                this.autoRotation += this.rotationSpeed;
+                
+                // 缓慢生长
+                if (this.growthProgress < this.maxGrowth) {
+                    this.growthProgress += 0.001;
+                }
+                
+                // 更新粒子位置
                 this.particles.forEach(p => {
-                    const rotation = this.mouse.x * 0.3;
+                    const rotation = this.autoRotation;
                     const cos = Math.cos(rotation);
                     const sin = Math.sin(rotation);
+                    
+                    const growthFactor = Math.min(1, p.growth + this.growthProgress);
                     
                     const rotatedX = p.baseX * cos - p.z * sin;
                     const rotatedZ = p.z * cos + p.baseX * sin;
                     
-                    p.x = rotatedX + this.centerX;
+                    p.x = rotatedX * growthFactor + this.centerX;
                     
                     if (!p.isTrunk) {
-                        p.y = p.baseY + Math.sin(time * p.swaySpeed + p.swayOffset) * 2; 
+                        const spiralSway = Math.sin(time * 0.5 + p.spiralAngle) * 2;
+                        p.y = p.baseY + Math.sin(time * p.swaySpeed + p.swayOffset) * 2 * growthFactor + spiralSway;
                     } else {
-                        p.y = p.baseY;
+                        p.y = p.baseY * growthFactor;
                     }
                 });
 
+                // 更新灯光
                 this.lights.forEach(l => {
-                    const rotation = this.mouse.x * 0.3;
+                    const rotation = this.autoRotation;
                     const cos = Math.cos(rotation);
                     const sin = Math.sin(rotation);
+                    
+                    const growthFactor = Math.min(1, l.growth + this.growthProgress);
                     
                     const rotatedX = l.baseX * cos - l.z * sin;
                     const rotatedZ = l.z * cos + l.baseX * sin;
 
-                    l.x = rotatedX + this.centerX;
-                    l.y = l.baseY;
+                    l.x = rotatedX * growthFactor + this.centerX;
+                    l.y = l.baseY * growthFactor;
 
                     const sinPart = (Math.sin(time * l.blinkSpeed + l.blinkOffset) + 1) / 2;
                     const noisePart = (this.noise(l.flickerSeed, time) + 1) / 2 * 0.25;
                     l.alpha = Math.min(1, l.baseAlpha * (0.6 + 0.8 * sinPart) + noisePart);
 
-                    l.x += Math.sin(time * 2 + l.flickerSeed) * 0.6;
-                    l.y += Math.cos(time * 1.5 + l.flickerSeed) * 0.4;
+                    l.x += Math.sin(time * 2 + l.flickerSeed + l.spiralAngle) * 0.8 * growthFactor;
+                    l.y += Math.cos(time * 1.5 + l.flickerSeed + l.spiralAngle) * 0.6 * growthFactor;
 
                     if (l.sparkleChance > 0 && Math.random() < l.sparkleChance) {
                         l._sparkle = 0.9 + Math.random() * 0.5;
@@ -429,14 +846,145 @@
                     }
                 });
 
+                // 更新顶部礼盒
+                this.topGifts.forEach(gift => {
+                    const rotation = this.autoRotation;
+                    const cos = Math.cos(rotation);
+                    const sin = Math.sin(rotation);
+                    
+                    const growthFactor = Math.min(1, gift.growth + this.growthProgress);
+                    
+                    const rotatedX = gift.baseX * cos - gift.z * sin;
+                    const rotatedZ = gift.z * cos + gift.baseX * sin;
+
+                    gift.x = rotatedX * growthFactor + this.centerX;
+                    
+                    // 顶部礼盒有特殊的浮动效果
+                    const floatOffset = Math.sin(time * gift.floatSpeed + gift.timeOffset) * gift.floatHeight;
+                    const spiralSway = Math.sin(time * 0.3 + gift.spiralAngle) * 4;
+                    gift.y = gift.baseY * growthFactor + Math.sin(time * gift.swaySpeed + gift.swayOffset) * 3 + spiralSway + floatOffset;
+                    
+                    // 顶部礼盒旋转更快
+                    gift.rotation += gift.rotationSpeed + 0.004;
+                    
+                    // 顶部礼盒发光效果最强
+                    gift.glow = 0.5 + 0.4 * Math.sin(time * 2.0 + gift.timeOffset);
+                    
+                    // 顶部礼盒闪烁更频繁
+                    if (Math.random() < 0.015) {
+                        gift.sparkleTimer = 20;
+                        gift.sparkleIntensity = 0.6 + Math.random() * 0.6;
+                    }
+                    
+                    if (gift.sparkleTimer > 0) {
+                        gift.sparkleTimer--;
+                    }
+                });
+
+                // 更新上部礼盒
+                this.upperGifts.forEach(gift => {
+                    const rotation = this.autoRotation;
+                    const cos = Math.cos(rotation);
+                    const sin = Math.sin(rotation);
+                    
+                    const growthFactor = Math.min(1, gift.growth + this.growthProgress);
+                    
+                    const rotatedX = gift.baseX * cos - gift.z * sin;
+                    const rotatedZ = gift.z * cos + gift.baseX * sin;
+
+                    gift.x = rotatedX * growthFactor + this.centerX;
+                    
+                    const spiralSway = Math.sin(time * 0.25 + gift.spiralAngle) * 3;
+                    gift.y = gift.baseY * growthFactor + Math.sin(time * gift.swaySpeed + gift.swayOffset) * 2.5 + spiralSway;
+                    
+                    gift.rotation += gift.rotationSpeed + 0.003;
+                    
+                    gift.glow = 0.4 + 0.3 * Math.sin(time * 1.8 + gift.timeOffset);
+                    
+                    if (Math.random() < 0.012) {
+                        gift.sparkleTimer = 18;
+                        gift.sparkleIntensity = 0.5 + Math.random() * 0.5;
+                    }
+                    
+                    if (gift.sparkleTimer > 0) {
+                        gift.sparkleTimer--;
+                    }
+                });
+
+                // 更新中部礼盒
+                this.gifts.forEach(gift => {
+                    const rotation = this.autoRotation;
+                    const cos = Math.cos(rotation);
+                    const sin = Math.sin(rotation);
+                    
+                    const growthFactor = Math.min(1, gift.growth + this.growthProgress);
+                    
+                    const rotatedX = gift.baseX * cos - gift.z * sin;
+                    const rotatedZ = gift.z * cos + gift.baseX * sin;
+
+                    gift.x = rotatedX * growthFactor + this.centerX;
+                    
+                    const spiralSway = Math.sin(time * 0.2 + gift.spiralAngle) * 2;
+                    gift.y = gift.baseY * growthFactor + Math.sin(time * gift.swaySpeed + gift.swayOffset) * 2 + spiralSway;
+                    
+                    gift.rotation += gift.rotationSpeed + 0.002;
+                    
+                    gift.glow = 0.3 + 0.2 * Math.sin(time * 1.5 + gift.timeOffset);
+                    
+                    if (Math.random() < 0.01) {
+                        gift.sparkleTimer = 15;
+                        gift.sparkleIntensity = 0.4 + Math.random() * 0.4;
+                    }
+                    
+                    if (gift.sparkleTimer > 0) {
+                        gift.sparkleTimer--;
+                    }
+                });
+
+                // 更新螺旋灯带
+                this.spiralLights.forEach(light => {
+                    const rotation = this.autoRotation;
+                    const cos = Math.cos(rotation);
+                    const sin = Math.sin(rotation);
+                    
+                    const growthFactor = Math.min(1, light.growth + this.growthProgress);
+                    
+                    const rotatedX = light.baseX * cos - light.z * sin;
+                    const rotatedZ = light.z * cos + light.baseX * sin;
+
+                    light.x = rotatedX * growthFactor + this.centerX;
+                    light.y = light.baseY * growthFactor;
+                    
+                    const sinPart = (Math.sin(time * light.pulseSpeed + light.phase + light.spiralAngle) + 1) / 2;
+                    const noisePart = (this.noise(light.flickerSeed, time) + 1) / 2 * 0.3;
+                    light.alpha = Math.min(1, light.baseAlpha * (0.7 + 0.6 * sinPart) + noisePart);
+                    
+                    light.trailOffset = (light.trailOffset + 1) % (light.trailLength + 1);
+                });
+
+                // 更新雪花
                 this.snowflakes.forEach(s => {
+                    if (s.growth < s.targetSize) {
+                        s.growth += s.growthSpeed;
+                    } else {
+                        s.growth = 0;
+                        s.targetSize = Math.random() * 1.8 + 1;
+                    }
+                    
+                    const currentSize = s.baseSize * (1 + s.growth);
+                    
                     s.y += s.speedY * s.z; 
-                    s.x += Math.sin(time + s.y * 0.01) * s.swayAmp - this.mouse.x * 2; 
-                    s.rotation += s.rotationSpeed;
+                    s.x += Math.sin(time + s.y * 0.01) * s.swayAmp;
+                    s.rotation += s.rotationSpeed * (1 + s.growth * 0.5);
+                    
+                    s.size = currentSize;
                     
                     if (s.y > this.screenHeight) {
                         s.y = -10;
                         s.x = Math.random() * this.screenWidth;
+                        s.size = s.baseSize = Math.random() * 4 + 3; // 更新为新的基础尺寸
+                        s.growth = 0;
+                        s.targetSize = Math.random() * 1.8 + 1;
                     }
                     if (s.x > this.screenWidth) s.x = 0;
                     if (s.x < 0) s.x = this.screenWidth;
@@ -445,10 +993,10 @@
                 // 更新顶部星星
                 if (this.topStar) {
                     this.topStar.time = time;
-                    this.topStar.rotation += 0.003;
+                    this.topStar.rotation += this.topStar.rotationSpeed;
                     
-                    this.topStar.size = 24 * this.treeScale + Math.sin(time * this.topStar.pulseSpeed) * 3;
-                    this.topStar.glowSize = 40 * this.treeScale + Math.sin(time * 1.5) * 8;
+                    this.topStar.size = 30 * this.treeScale + Math.sin(time * this.topStar.pulseSpeed) * 3.5; // 调整脉动幅度
+                    this.topStar.glowSize = 48 * this.treeScale + Math.sin(time * 1.5) * 8; // 调整脉动幅度
                     
                     this.topStar.sparkleInterval++;
                     if (this.topStar.sparkleInterval > 30 + Math.random() * 50) {
@@ -477,27 +1025,97 @@
                 ctx.fill();
             }
 
-            // 修复的星星绘制函数
+            drawSpiralLight(x, y, size, color, alpha, glow, trailLength, trailOffset) {
+                const ctx = this.ctx;
+                
+                for (let i = 0; i < trailLength; i++) {
+                    if (i === trailOffset) continue;
+                    
+                    const trailAlpha = alpha * (1 - i / trailLength) * 0.3;
+                    const trailGlow = glow * (1 - i / trailLength * 0.7);
+                    
+                    const g = ctx.createRadialGradient(x, y, 0, x, y, trailGlow);
+                    g.addColorStop(0, this.hexToRgba(color, trailAlpha * 0.5));
+                    g.addColorStop(0.3, this.hexToRgba(color, trailAlpha * 0.3));
+                    g.addColorStop(1, this.hexToRgba(color, 0));
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.arc(x, y, trailGlow, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                
+                this.drawLightGlow(x, y, size, color, alpha, glow);
+            }
+
+            drawGift(x, y, size, rotation, boxColor, ribbonColor, glow = 0, sparkle = 0) {
+                const ctx = this.ctx;
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(rotation);
+                
+                if (glow > 0) {
+                    ctx.globalCompositeOperation = 'lighter';
+                    const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 2);
+                    glowGradient.addColorStop(0, this.hexToRgba(boxColor, glow * 0.3));
+                    glowGradient.addColorStop(1, this.hexToRgba(boxColor, 0));
+                    ctx.fillStyle = glowGradient;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, size * 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+                
+                ctx.fillStyle = boxColor;
+                ctx.fillRect(-size/2, -size/2, size, size);
+                
+                ctx.fillStyle = this.hexToRgba('#FFFFFF', 0.15);
+                ctx.fillRect(-size/2, -size/2, size * 0.8, size * 0.12);
+                ctx.fillRect(-size/2, -size/2, size * 0.12, size * 0.8);
+                
+                ctx.fillStyle = ribbonColor;
+                ctx.fillRect(-size/2, -size/6, size, size/3);
+                ctx.fillRect(-size/6, -size/2, size/3, size);
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, size/4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = this.hexToRgba('#FFFFFF', 0.3);
+                ctx.beginPath();
+                ctx.arc(-size/8, -size/8, size/8, 0, Math.PI * 2);
+                ctx.arc(size/8, -size/8, size/8, 0, Math.PI * 2);
+                ctx.arc(-size/8, size/8, size/8, 0, Math.PI * 2);
+                ctx.arc(size/8, size/8, size/8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                if (sparkle > 0) {
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.fillStyle = `rgba(255, 255, 255, ${sparkle})`;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, size * 0.8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+                
+                ctx.restore();
+            }
+
             drawStar(x, y, spikes, outerRadius, innerRadius, color, rotation = 0) {
                 const ctx = this.ctx;
                 ctx.save();
                 ctx.translate(x, y);
                 ctx.rotate(rotation);
                 
-                // 确保星星绘制完整
                 const angleStep = (Math.PI * 2) / spikes;
                 const halfAngleStep = angleStep / 2;
                 
                 ctx.beginPath();
                 
-                // 从顶部开始
                 for (let i = 0; i < spikes; i++) {
-                    // 外角
                     const outerAngle = i * angleStep - Math.PI / 2;
                     const outerX = Math.cos(outerAngle) * outerRadius;
                     const outerY = Math.sin(outerAngle) * outerRadius;
                     
-                    // 内角
                     const innerAngle = outerAngle + halfAngleStep;
                     const innerX = Math.cos(innerAngle) * innerRadius;
                     const innerY = Math.sin(innerAngle) * innerRadius;
@@ -511,7 +1129,6 @@
                     ctx.lineTo(innerX, innerY);
                 }
                 
-                // 回到起点
                 const firstOuterX = Math.cos(-Math.PI / 2) * outerRadius;
                 const firstOuterY = Math.sin(-Math.PI / 2) * outerRadius;
                 ctx.lineTo(firstOuterX, firstOuterY);
@@ -522,7 +1139,6 @@
                 ctx.restore();
             }
 
-            // 绘制六边形雪花
             drawHexagonSnowflake(x, y, size, rotation, opacity) {
                 const ctx = this.ctx;
                 ctx.save();
@@ -564,7 +1180,6 @@
                 ctx.restore();
             }
 
-            // 绘制星形雪花
             drawStarSnowflake(x, y, size, rotation, opacity) {
                 const ctx = this.ctx;
                 ctx.save();
@@ -597,7 +1212,6 @@
                 ctx.restore();
             }
 
-            // 绘制花形雪花
             drawFlowerSnowflake(x, y, size, rotation, opacity) {
                 const ctx = this.ctx;
                 ctx.save();
@@ -663,43 +1277,107 @@
 
                 this.ctx.globalCompositeOperation = 'lighter';
 
-                // 绘制树叶与树干
                 this.particles.forEach(p => {
                     this.ctx.beginPath();
                     const sizeMultiplier = p.isTrunk ? 1.5 : 1;
-                    this.ctx.arc(p.x, p.y, p.size * this.treeScale * sizeMultiplier, 0, Math.PI * 2);
+                    const growthFactor = Math.min(1, p.growth + this.growthProgress);
+                    this.ctx.arc(p.x, p.y, p.size * this.treeScale * sizeMultiplier * growthFactor, 0, Math.PI * 2);
                     this.ctx.fillStyle = p.color;
                     this.ctx.globalAlpha = p.isTrunk ? 0.9 : 0.6;
                     this.ctx.fill();
                 });
 
-                // 绘制灯珠
+                // 绘制螺旋灯带
+                this.spiralLights.forEach(light => {
+                    const growthFactor = Math.min(1, light.growth + this.growthProgress);
+                    this.drawSpiralLight(
+                        light.x,
+                        light.y,
+                        light.size * this.treeScale * growthFactor,
+                        light.color,
+                        light.alpha,
+                        light.glow * this.treeScale * growthFactor,
+                        light.trailLength,
+                        light.trailOffset
+                    );
+                });
+
+                // 绘制中部礼盒
+                this.gifts.forEach(gift => {
+                    const sparkleIntensity = gift.sparkleTimer > 0 ? 
+                        (gift.sparkleIntensity * (gift.sparkleTimer / 15)) : 0;
+                    
+                    this.drawGift(
+                        gift.x, 
+                        gift.y, 
+                        gift.size * Math.min(1, gift.growth + this.growthProgress), 
+                        gift.rotation, 
+                        gift.color, 
+                        gift.ribbonColor, 
+                        gift.glow,
+                        sparkleIntensity
+                    );
+                });
+
+                // 绘制上部礼盒
+                this.upperGifts.forEach(gift => {
+                    const sparkleIntensity = gift.sparkleTimer > 0 ? 
+                        (gift.sparkleIntensity * (gift.sparkleTimer / 18)) : 0;
+                    
+                    this.drawGift(
+                        gift.x, 
+                        gift.y, 
+                        gift.size * Math.min(1, gift.growth + this.growthProgress), 
+                        gift.rotation, 
+                        gift.color, 
+                        gift.ribbonColor, 
+                        gift.glow,
+                        sparkleIntensity
+                    );
+                });
+
+                // 绘制顶部礼盒（最后绘制，在最上层）
+                this.topGifts.forEach(gift => {
+                    const sparkleIntensity = gift.sparkleTimer > 0 ? 
+                        (gift.sparkleIntensity * (gift.sparkleTimer / 20)) : 0;
+                    
+                    this.drawGift(
+                        gift.x, 
+                        gift.y, 
+                        gift.size * Math.min(1, gift.growth + this.growthProgress), 
+                        gift.rotation, 
+                        gift.color, 
+                        gift.ribbonColor, 
+                        gift.glow,
+                        sparkleIntensity
+                    );
+                });
+
                 this.lights.forEach(l => {
+                    const growthFactor = Math.min(1, l.growth + this.growthProgress);
                     let depthBoost = l.z > 0 ? 1.1 : 1.0;
-                    this.drawLightGlow(l.x, l.y, l.size * this.treeScale, l.color, l.alpha * depthBoost, l.glow * this.treeScale);
+                    this.drawLightGlow(l.x, l.y, l.size * this.treeScale * growthFactor, l.color, l.alpha * depthBoost, l.glow * this.treeScale * growthFactor);
                     
                     if (Math.random() < 0.02) {
                         this.drawSparkle(
                             l.x + (Math.random()-0.5)*4,
                             l.y + (Math.random()-0.5)*4,
-                            Math.max(2, l.size*2),
+                            Math.max(2, l.size*2) * growthFactor,
                             0.9 + Math.random()*0.6
                         );
                     }
                 });
 
-                // 绘制顶部星星 - 确保星星在最前面
                 if (this.topStar) {
                     const star = this.topStar;
                     const time = Date.now() / 1000;
+                    const growthFactor = Math.min(1, star.growth + this.growthProgress);
                     
-                    // 保存当前状态
                     this.ctx.save();
                     
-                    // 绘制光晕
                     const glowGradient = this.ctx.createRadialGradient(
                         star.x, star.y, 0,
-                        star.x, star.y, star.glowSize
+                        star.x, star.y, star.glowSize * growthFactor
                     );
                     
                     glowGradient.addColorStop(0, 'rgba(255, 255, 200, 0.9)');
@@ -710,13 +1388,12 @@
                     this.ctx.globalCompositeOperation = 'lighter';
                     this.ctx.fillStyle = glowGradient;
                     this.ctx.beginPath();
-                    this.ctx.arc(star.x, star.y, star.glowSize, 0, Math.PI * 2);
+                    this.ctx.arc(star.x, star.y, star.glowSize * growthFactor, 0, Math.PI * 2);
                     this.ctx.fill();
                     
-                    // 绘制内层光晕
                     const innerGlowGradient = this.ctx.createRadialGradient(
                         star.x, star.y, 0,
-                        star.x, star.y, star.glowSize * 0.6
+                        star.x, star.y, star.glowSize * 0.6 * growthFactor
                     );
                     
                     innerGlowGradient.addColorStop(0, 'rgba(255, 255, 230, 0.9)');
@@ -725,39 +1402,35 @@
                     
                     this.ctx.fillStyle = innerGlowGradient;
                     this.ctx.beginPath();
-                    this.ctx.arc(star.x, star.y, star.glowSize * 0.6, 0, Math.PI * 2);
+                    this.ctx.arc(star.x, star.y, star.glowSize * 0.6 * growthFactor, 0, Math.PI * 2);
                     this.ctx.fill();
                     
-                    // 绘制星星主体 - 使用修复后的绘制函数
                     this.ctx.globalCompositeOperation = 'source-over';
                     this.drawStar(
                         star.x, 
                         star.y, 
                         star.spikes, 
-                        star.size, 
-                        star.size * star.innerRadius, 
+                        star.size * growthFactor, 
+                        star.size * star.innerRadius * growthFactor, 
                         '#FFD700', 
                         star.rotation
                     );
                     
-                    // 绘制星星高光
                     this.drawStar(
                         star.x, 
                         star.y, 
                         star.spikes, 
-                        star.size * 0.7,
-                        star.size * 0.7 * star.innerRadius, 
+                        star.size * 0.7 * growthFactor,
+                        star.size * 0.7 * star.innerRadius * growthFactor, 
                         '#FFFACD', 
                         star.rotation + 0.1
                     );
                     
-                    // 绘制中心亮点
                     this.ctx.beginPath();
-                    this.ctx.arc(star.x, star.y, star.size * 0.3, 0, Math.PI * 2);
+                    this.ctx.arc(star.x, star.y, star.size * 0.3 * growthFactor, 0, Math.PI * 2);
                     this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
                     this.ctx.fill();
                     
-                    // 随机闪烁效果
                     if (Math.random() < 0.15) {
                         this.drawSparkle(
                             star.x + (Math.random()-0.5)*15,
@@ -767,14 +1440,12 @@
                         );
                     }
                     
-                    // 如果正在闪光
                     if (star._sparkleTimer > 0) {
                         star._sparkleTimer--;
                         const sparkleAlpha = star._sparkleTimer / 15;
                         this.drawSparkle(star.x, star.y, 25, sparkleAlpha * (star._sparkle || 1));
                     }
                     
-                    // 恢复状态
                     this.ctx.restore();
                 }
 
@@ -782,13 +1453,11 @@
                 
                 // 绘制雪花
                 this.snowflakes.forEach(s => {
-                    // 检查雪花是否在星星附近
                     if (this.topStar) {
                         const dx = s.x - this.topStar.x;
                         const dy = s.y - this.topStar.y;
                         const distance = Math.sqrt(dx * dx + dy * dy);
                         
-                        // 如果雪花在星星附近，跳过绘制
                         if (distance < 60) {
                             return;
                         }
@@ -820,22 +1489,49 @@
             }
         }
 
-        // 页面加载完成后启动动画
         window.addEventListener('load', () => {
-            // 确保页面不滚动
             document.body.style.overflow = 'hidden';
             document.documentElement.style.overflow = 'hidden';
             
-            // 启动动画
-            new ChristmasAnimation();
+            // 隐藏地址栏（移动设备）
+            setTimeout(() => {
+                window.scrollTo(0, 1);
+            }, 0);
+            
+            // 延迟初始化以确保尺寸正确
+            setTimeout(() => {
+                const animation = new ChristmasAnimation();
+                
+                // 存储引用以便在控制台调试
+                window.christmasAnimation = animation;
+                
+                // 页面可见性变化时重绘
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden) {
+                        animation.handleResize();
+                    }
+                });
+            }, 100);
         });
 
-        // 防止iOS Safari工具栏影响布局
         window.addEventListener('orientationchange', () => {
             setTimeout(() => {
                 window.scrollTo(0, 0);
+                if (window.christmasAnimation) {
+                    window.christmasAnimation.handleResize();
+                }
             }, 100);
         });
+
+        // 防止双击缩放
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(event) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
     </script>
 </body>
 </html>
