@@ -18,6 +18,7 @@
             height: 100%;
             overflow: hidden;
             overscroll-behavior: none;
+            touch-action: none; /* 防止触摸操作 */
         }
         
         body {
@@ -32,7 +33,7 @@
             -moz-user-select: none;
             -ms-user-select: none;
             user-select: none;
-            cursor: pointer; /* 添加点击光标提示 */
+            cursor: pointer; 
         }
         
         #canvasContainer {
@@ -126,7 +127,6 @@
                 textGlow 3s ease-in-out infinite 3s;
         }
 
-        /* 点击提示样式 */
         .tap-hint {
             position: fixed;
             top: 50%;
@@ -148,7 +148,38 @@
             50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
         }
 
-        /* 移动设备响应式调整 */
+        /* 手机端优化 */
+        @media screen and (max-width: 768px) {
+            #mainText {
+                font-size: clamp(40px, 8vw, 56px) !important;
+                text-shadow: 
+                    0 0 8px rgba(255, 215, 0, 0.8),
+                    0 0 16px rgba(255, 215, 0, 0.6),
+                    0 0 24px rgba(255, 215, 0, 0.4) !important;
+            }
+            
+            #textContainer {
+                bottom: 8% !important;
+                gap: 15px;
+            }
+            
+            .tap-hint {
+                font-size: 16px;
+            }
+        }
+
+        /* 横屏优化 */
+        @media screen and (orientation: landscape) {
+            #mainText {
+                font-size: clamp(40px, 5vw, 60px) !important;
+            }
+            
+            #textContainer {
+                bottom: 5% !important;
+            }
+        }
+
+        /* 小屏幕优化 */
         @media screen and (max-height: 500px) {
             #mainText {
                 font-size: clamp(36px, 5vw, 48px) !important;
@@ -160,20 +191,13 @@
             }
             
             .tap-hint {
-                font-size: 16px;
+                font-size: 14px;
                 top: 20px;
                 transform: translateX(-50%);
             }
         }
 
-        /* 横屏模式优化 */
-        @media screen and (orientation: landscape) and (max-height: 500px) {
-            #mainText {
-                font-size: clamp(32px, 4vw, 40px) !important;
-            }
-        }
-
-        /* 全屏模式优化 */
+        /* 全屏样式 */
         :fullscreen, ::backdrop {
             background-color: transparent;
         }
@@ -190,15 +214,19 @@
     </div>
 
     <script>
-        // 全屏功能函数
+        // 检测设备类型
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isTablet = /iPad|Tablet|PlayBook|Silk/i.test(navigator.userAgent);
+        const isLandscape = window.innerWidth > window.innerHeight;
+
         function requestFullscreen() {
             const elem = document.documentElement;
             
             if (elem.requestFullscreen) {
                 elem.requestFullscreen();
-            } else if (elem.webkitRequestFullscreen) { /* Safari */
+            } else if (elem.webkitRequestFullscreen) { 
                 elem.webkitRequestFullscreen();
-            } else if (elem.msRequestFullscreen) { /* IE11 */
+            } else if (elem.msRequestFullscreen) { 
                 elem.msRequestFullscreen();
             }
         }
@@ -206,9 +234,9 @@
         function exitFullscreen() {
             if (document.exitFullscreen) {
                 document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) { /* Safari */
+            } else if (document.webkitExitFullscreen) { 
                 document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) { /* IE11 */
+            } else if (document.msExitFullscreen) { 
                 document.msExitFullscreen();
             }
         }
@@ -225,14 +253,12 @@
             }
         }
 
-        // 显示点击提示
         function showTapHint() {
             const tapHint = document.getElementById('tapHint');
             setTimeout(() => {
                 tapHint.style.opacity = '1';
             }, 3000);
             
-            // 5秒后自动隐藏
             setTimeout(() => {
                 tapHint.style.opacity = '0';
             }, 8000);
@@ -246,11 +272,22 @@
                 this.resizeTimeout = null;
                 this.isFullscreen = false;
                 
-                // 移除鼠标交互，改为自动旋转
+                // 根据设备类型调整参数
+                this.isMobileDevice = isMobile;
+                this.isTabletDevice = isTablet;
+                this.isLandscapeMode = isLandscape;
+                
+                // 性能优化参数
+                this.performanceMultiplier = this.isMobileDevice ? 0.7 : 1;
+                if (this.isTabletDevice) {
+                    this.performanceMultiplier = 0.85;
+                }
+                
+                // 动画参数 - 修复：确保自动旋转速度
                 this.autoRotation = 0;
-                this.rotationSpeed = 0.005; // 自动旋转速度
-                this.growthProgress = 0; // 生长进度
-                this.maxGrowth = 1; // 最大生长值
+                this.rotationSpeed = 0.005; // 固定旋转速度，确保自动旋转
+                this.growthProgress = 0; 
+                this.maxGrowth = 1; 
                 
                 this.setupCanvas();
                 this.initColors();
@@ -259,18 +296,22 @@
                 
                 this.preventScroll();
                 
-                // 添加窗口大小调整监听
                 window.addEventListener('resize', () => this.handleResize());
                 
-                // 显示点击提示
                 showTapHint();
                 
-                // 监听全屏变化
                 this.setupFullscreenListeners();
+                
+                // 性能监控
+                this.lastDrawTime = 0;
+                this.frameCount = 0;
+                this.fps = 60;
+                
+                // 动画帧ID
+                this.animationFrameId = null;
             }
 
             setupCanvas() {
-                // 获取更准确的屏幕尺寸
                 const getScreenDimensions = () => {
                     return {
                         width: Math.max(document.documentElement.clientWidth, window.innerWidth || 0),
@@ -280,31 +321,40 @@
                 
                 const { width, height } = getScreenDimensions();
                 
-                this.dpr = Math.min(window.devicePixelRatio || 1, 2); // 限制最大DPI缩放
+                // 设备像素比优化
+                this.dpr = Math.min(window.devicePixelRatio || 1, this.isMobileDevice ? 2.5 : 3);
                 this.screenWidth = width;
                 this.screenHeight = height;
                 
-                // 设置画布尺寸
-                this.canvas.width = this.screenWidth * this.dpr;
-                this.canvas.height = this.screenHeight * this.dpr;
+                // 确保canvas尺寸为整数
+                this.canvas.width = Math.round(this.screenWidth * this.dpr);
+                this.canvas.height = Math.round(this.screenHeight * this.dpr);
                 this.canvas.style.width = `${this.screenWidth}px`;
                 this.canvas.style.height = `${this.screenHeight}px`;
                 
-                // 重置变换矩阵
                 this.ctx.setTransform(1, 0, 0, 1, 0, 0);
                 this.ctx.scale(this.dpr, this.dpr);
                 
                 this.centerX = this.screenWidth / 2;
                 this.centerY = this.screenHeight / 2;
                 
-                // 树干位置保持不变
-                this.trunkBaseY = this.screenHeight * 0.7; 
+                // 自适应树的大小
+                const baseSize = Math.min(this.screenWidth, this.screenHeight);
+                const referenceSize = Math.min(850, Math.max(500, baseSize));
+                this.treeScale = baseSize / referenceSize;
                 
-                // 树冠基准点向下移动
-                this.crownBaseY = this.screenHeight * 0.82; 
+                // 手机竖屏调整
+                if (this.screenHeight > this.screenWidth * 1.5) {
+                    this.treeScale *= 0.9;
+                }
                 
-                // 增大树的比例因子，从800改为850，使整体略小一点
-                this.treeScale = Math.min(this.screenWidth, this.screenHeight) / 850;
+                // 手机横屏调整
+                if (this.isLandscapeMode && this.isMobileDevice) {
+                    this.treeScale *= 0.85;
+                }
+                
+                this.trunkBaseY = this.screenHeight * 0.7;
+                this.crownBaseY = this.screenHeight * 0.82;
                 
                 // 隐藏加载提示
                 setTimeout(() => {
@@ -316,24 +366,40 @@
             }
 
             setupFullscreenListeners() {
-                // 点击屏幕切换全屏
-                document.addEventListener('click', () => {
-                    toggleFullscreen();
-                    // 隐藏点击提示
-                    document.getElementById('tapHint').style.opacity = '0';
+                document.addEventListener('click', (e) => {
+                    // 防止多次点击
+                    if (e.target.closest('#canvasContainer')) {
+                        toggleFullscreen();
+                        document.getElementById('tapHint').style.opacity = '0';
+                    }
                 });
                 
-                // 监听全屏变化
+                // 触摸事件处理
+                let touchStartY = 0;
+                document.addEventListener('touchstart', (e) => {
+                    touchStartY = e.touches[0].clientY;
+                }, { passive: true });
+                
+                document.addEventListener('touchmove', (e) => {
+                    // 防止页面滚动
+                    if (e.touches.length === 1) {
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+                
                 document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
                 document.addEventListener('webkitfullscreenchange', () => this.handleFullscreenChange());
                 document.addEventListener('msfullscreenchange', () => this.handleFullscreenChange());
                 
-                // 添加键盘快捷键支持（按F键进入/退出全屏）
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'f' || e.key === 'F') {
+                // 双击切换全屏
+                let lastTap = 0;
+                document.addEventListener('touchend', (e) => {
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTap;
+                    if (tapLength < 300 && tapLength > 0) {
                         toggleFullscreen();
-                        e.preventDefault();
                     }
+                    lastTap = currentTime;
                 });
             }
 
@@ -342,35 +408,39 @@
                                       document.webkitFullscreenElement || 
                                       document.msFullscreenElement);
                 
-                // 全屏状态变化后重新调整画布
+                // 重新调整画布大小
                 setTimeout(() => {
                     this.handleResize();
                 }, 100);
             }
 
             handleResize() {
-                // 防抖处理，避免频繁重绘
                 if (this.resizeTimeout) {
                     clearTimeout(this.resizeTimeout);
                 }
                 
                 this.resizeTimeout = setTimeout(() => {
+                    this.isLandscapeMode = window.innerWidth > window.innerHeight;
                     this.setupCanvas();
                     this.createScene();
-                    // 确保画布尺寸正确
                     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
                 }, 250);
             }
 
             preventScroll() {
+                // 防止触摸滚动
                 document.addEventListener('touchmove', (e) => {
-                    e.preventDefault();
+                    if (e.touches.length === 1) {
+                        e.preventDefault();
+                    }
                 }, { passive: false });
                 
+                // 防止鼠标滚轮
                 document.addEventListener('wheel', (e) => {
                     e.preventDefault();
                 }, { passive: false });
                 
+                // 防止键盘滚动
                 document.addEventListener('keydown', (e) => {
                     if ([32, 37, 38, 39, 40].includes(e.keyCode)) {
                         e.preventDefault();
@@ -382,7 +452,6 @@
                 this.TREE_COLORS = ["#2E8B57", "#3CB371", "#20B2AA", "#66CDAA", "#00FA9A"];
                 this.LIGHT_COLORS = ["#FF6B9D", "#FFD166", "#7CE6E6", "#FF8AF0", "#FFA552", "#93FF9B"];
                 this.TRUNK_COLORS = ["#5C3317", "#6F4E37", "#8B4513"];
-                // 礼盒颜色
                 this.GIFT_COLORS = [
                     { box: "#FF6B6B", ribbon: "#FFD166" },
                     { box: "#4ECDC4", ribbon: "#FFE66D" },
@@ -393,7 +462,6 @@
                     { box: "#FFD3B6", ribbon: "#A8E6CF" },
                     { box: "#D4A5A5", ribbon: "#FFE8E8" },
                 ];
-                // 螺旋灯带颜色
                 this.SPIRAL_LIGHT_COLORS = [
                     "#FF6B9D", "#FFD166", "#7CE6E6", "#FF8AF0", 
                     "#4ECDC4", "#95E1D3", "#A8E6CF", "#FFD3B6"
@@ -408,34 +476,28 @@
                 this.topStar = null;
                 this.gifts = [];     
                 this.upperGifts = []; 
-                this.topGifts = [];   // 新增：顶部礼盒
+                this.topGifts = [];   
                 this.spiralLights = [];
 
-                // 创建圣诞树（树干部分）
-                this.createChristmasTreeTrunk();
+                // 根据设备性能调整粒子数量
+                const trunkMultiplier = this.performanceMultiplier;
+                const particleMultiplier = this.performanceMultiplier;
+                const giftMultiplier = this.performanceMultiplier;
                 
-                // 创建圣诞树（树冠部分）
-                this.createChristmasTreeCrown();
-                
-                // 创建雪花（减小尺寸）
+                this.createChristmasTreeTrunk(trunkMultiplier);
+                this.createChristmasTreeCrown(particleMultiplier);
                 this.createSnowflakes();
-                
-                // 创建顶部星星
                 this.createTopStar();
-                
-                // 创建礼盒
-                this.createTopGifts();    // 先创建顶部礼盒
-                this.createUpperGifts();  // 然后创建上部礼盒
-                this.createGifts();       // 最后创建中部礼盒
-                
-                // 创建螺旋灯带
-                this.createSpiralLights();
+                this.createTopGifts(giftMultiplier);    
+                this.createUpperGifts(giftMultiplier);  
+                this.createGifts(giftMultiplier);      
+                this.createSpiralLights(particleMultiplier);
             }
 
-            createChristmasTreeTrunk() {
-                const trunkHeight = 140 * this.treeScale; // 增加树干高度
-                const trunkRadius = 50 * this.treeScale; // 增加树干半径
-                const trunkCount = 1000; // 增加树干粒子数量
+            createChristmasTreeTrunk(multiplier = 1) {
+                const trunkHeight = 140 * this.treeScale; 
+                const trunkRadius = 50 * this.treeScale; 
+                const trunkCount = Math.floor(1000 * multiplier); 
                 
                 for (let i = 0; i < trunkCount; i++) {
                     const p = i / trunkCount;
@@ -457,7 +519,7 @@
                         x: x, y: y, z: z,
                         baseX: x, baseY: y,
                         color: color,
-                        size: Math.random() * 3.5 + 3, // 调整粒子尺寸
+                        size: Math.random() * 3.5 + 3, 
                         swaySpeed: 0,
                         swayOffset: 0,
                         isTrunk: true,
@@ -466,37 +528,30 @@
                 }
             }
 
-            createChristmasTreeCrown() {
-                const particleCount = 3500; // 增加粒子数量
-                const treeHeight = 620 * this.treeScale; // 增加树冠高度
-                const maxRadius = 280 * this.treeScale; // 增加最大半径
-                
-                // 旋转式增长：螺旋角度
-                const spiralFactor = 10; // 螺旋系数，值越大螺旋越紧密
+            createChristmasTreeCrown(multiplier = 1) {
+                const particleCount = Math.floor(3500 * multiplier); 
+                const treeHeight = 620 * this.treeScale; 
+                const maxRadius = 280 * this.treeScale; 
+                const spiralFactor = 10; 
                 
                 for (let i = 0; i < particleCount; i++) {
                     const p = i / particleCount; 
-                    
-                    // 添加螺旋效果
                     const spiralAngle = i * 2.39996 + p * spiralFactor;
-                    
                     const currentHeight = treeHeight * p;
                     const currentRadius = maxRadius * (1 - p);
-                    
                     const r = currentRadius * Math.sqrt(Math.random()) * (0.8 + Math.random() * 0.4);
-                    
                     const x = Math.cos(spiralAngle) * r;
-                    const y = this.crownBaseY - currentHeight; // 使用树冠基准点
+                    const y = this.crownBaseY - currentHeight; 
                     const z = Math.sin(spiralAngle) * r;
 
                     if (Math.random() < 0.18) {
                         const color = this.LIGHT_COLORS[Math.floor(Math.random() * this.LIGHT_COLORS.length)];
-                        const size = Math.random() * 3.5 + 2.5; // 调整灯光尺寸
+                        const size = Math.random() * 3.5 + 2.5; 
                         const pulseSpeed = 1.0 + Math.random() * 3.5;
                         const phase = Math.random() * Math.PI * 2;
                         const baseAlpha = 0.5 + Math.random() * 0.6;
                         const sparkleChance = Math.random() < 0.15 ? 0.01 + Math.random()*0.03 : 0;
-                        const glow = 8 + Math.random() * 24; // 调整发光范围
+                        const glow = 8 + Math.random() * 24; 
                         this.lights.push({
                             x: x, y: y, z: z,
                             baseX: x, baseY: y,
@@ -516,7 +571,7 @@
                             x: x, y: y, z: z,
                             baseX: x, baseY: y,
                             color: this.TREE_COLORS[Math.floor(Math.random() * this.TREE_COLORS.length)],
-                            size: Math.random() * 1.8 + 0.6, // 调整枝叶粒子尺寸
+                            size: Math.random() * 1.8 + 0.6, 
                             swaySpeed: Math.random() * 2 + 1,
                             swayOffset: Math.random() * Math.PI * 2,
                             isTrunk: false,
@@ -527,44 +582,39 @@
                 }
             }
 
-            createTopGifts() {
-                const treeHeight = 620 * this.treeScale; // 调整树高
-                const maxRadius = 280 * this.treeScale; // 增加最大半径
-                const topGiftCount = 5; // 增加顶部礼盒数量
-                const spiralFactor = 12; // 螺旋系数较大，形成更紧密的螺旋
+            createTopGifts(multiplier = 1) {
+                const treeHeight = 620 * this.treeScale; 
+                const maxRadius = 280 * this.treeScale; 
+                const topGiftCount = Math.floor(5 * multiplier); 
+                const spiralFactor = 12; 
                 
                 for (let i = 0; i < topGiftCount; i++) {
-                    // 顶部礼盒位置：非常靠近树的顶部，在星星下方
-                    const heightRatio = 0.05 + Math.random() * 0.08; // 0.05-0.13，非常靠上
+                    const heightRatio = 0.05 + Math.random() * 0.08;
                     const currentHeight = treeHeight * heightRatio;
-                    const y = this.crownBaseY - currentHeight; // 使用树冠基准点
+                    const y = this.crownBaseY - currentHeight; 
                     
-                    // 顶部礼盒半径较小，紧贴树顶
-                    const radiusRatio = 0.3 + Math.random() * 0.3; // 0.3-0.6
+                    const radiusRatio = 0.3 + Math.random() * 0.3; 
                     const currentRadius = maxRadius * (1 - heightRatio) * radiusRatio;
                     
-                    // 添加螺旋效果
                     const spiralAngle = i * (Math.PI * 2 / topGiftCount) + heightRatio * spiralFactor;
                     
                     const x = Math.cos(spiralAngle) * currentRadius;
                     const z = Math.sin(spiralAngle) * currentRadius;
                     
-                    // 选择特殊的礼盒颜色，让顶部礼盒更显眼
                     const specialColors = [
-                        { box: "#FF6B6B", ribbon: "#FFD166" }, // 红色+金色
-                        { box: "#4ECDC4", ribbon: "#FFE66D" }, // 青色+黄色
-                        { box: "#FF8AF0", ribbon: "#7CE6E6" }, // 粉色+青色
-                        { box: "#FFD166", ribbon: "#FF6B9D" }, // 金色+粉色
-                        { box: "#A8E6CF", ribbon: "#FFAAA5" }  // 浅绿+粉色
+                        { box: "#FF6B6B", ribbon: "#FFD166" }, 
+                        { box: "#4ECDC4", ribbon: "#FFE66D" }, 
+                        { box: "#FF8AF0", ribbon: "#7CE6E6" }, 
+                        { box: "#FFD166", ribbon: "#FF6B9D" }, 
+                        { box: "#A8E6CF", ribbon: "#FFAAA5" }  
                     ];
                     const colorSet = specialColors[i % specialColors.length];
                     
-                    // 顶部礼盒较大，更显眼
-                    const size = (0.45 + Math.random() * 0.45) * this.treeScale * 25; // 调整礼盒尺寸
+                    const size = (0.45 + Math.random() * 0.45) * this.treeScale * 25; 
                     
                     const rotation = Math.random() * Math.PI * 2;
-                    const rotationSpeed = (Math.random() - 0.5) * 0.015; // 旋转速度较快
-                    const swaySpeed = 0.8 + Math.random() * 1.5; // 摆动较快
+                    const rotationSpeed = (Math.random() - 0.5) * 0.015; 
+                    const swaySpeed = 0.8 + Math.random() * 1.5; 
                     const swayOffset = Math.random() * Math.PI * 2;
                     
                     this.topGifts.push({
@@ -583,29 +633,27 @@
                         sparkleIntensity: 0,
                         growth: 1,
                         spiralAngle: spiralAngle,
-                        layer: "top", // 标记为顶层礼盒
-                        floatHeight: 5 + Math.random() * 10, // 浮动高度
-                        floatSpeed: 1 + Math.random() * 2    // 浮动速度
+                        layer: "top", 
+                        floatHeight: 5 + Math.random() * 10, 
+                        floatSpeed: 1 + Math.random() * 2    
                     });
                 }
             }
 
-            createUpperGifts() {
-                const treeHeight = 620 * this.treeScale; // 调整树高
-                const maxRadius = 280 * this.treeScale; // 增加最大半径
-                const upperGiftCount = 8; // 增加上部礼盒数量
+            createUpperGifts(multiplier = 1) {
+                const treeHeight = 620 * this.treeScale; 
+                const maxRadius = 280 * this.treeScale; 
+                const upperGiftCount = Math.floor(8 * multiplier); 
                 const spiralFactor = 8;
                 
                 for (let i = 0; i < upperGiftCount; i++) {
-                    // 礼盒位置：树的上部区域
-                    const heightRatio = 0.15 + Math.random() * 0.2; // 0.15-0.35
+                    const heightRatio = 0.15 + Math.random() * 0.2; 
                     const currentHeight = treeHeight * heightRatio;
-                    const y = this.crownBaseY - currentHeight; // 使用树冠基准点
+                    const y = this.crownBaseY - currentHeight; 
                     
-                    const radiusRatio = 0.6 + Math.random() * 0.3; // 0.6-0.9
+                    const radiusRatio = 0.6 + Math.random() * 0.3; 
                     const currentRadius = maxRadius * (1 - heightRatio) * radiusRatio;
                     
-                    // 添加螺旋效果
                     const spiralAngle = i * (Math.PI * 2 / upperGiftCount) + heightRatio * spiralFactor;
                     
                     const x = Math.cos(spiralAngle) * currentRadius;
@@ -613,7 +661,7 @@
                     
                     const colorSet = this.GIFT_COLORS[Math.floor(Math.random() * this.GIFT_COLORS.length)];
                     
-                    const size = (0.65 + Math.random() * 0.65) * this.treeScale * 28; // 调整礼盒尺寸
+                    const size = (0.65 + Math.random() * 0.65) * this.treeScale * 28; 
                     
                     const rotation = Math.random() * Math.PI * 2;
                     const rotationSpeed = (Math.random() - 0.5) * 0.012;
@@ -641,18 +689,18 @@
                 }
             }
 
-            createGifts() {
-                const treeHeight = 620 * this.treeScale; // 调整树高
-                const maxRadius = 280 * this.treeScale; // 增加最大半径
-                const giftCount = 6; // 增加中部礼盒数量
+            createGifts(multiplier = 1) {
+                const treeHeight = 620 * this.treeScale; 
+                const maxRadius = 280 * this.treeScale; 
+                const giftCount = Math.floor(6 * multiplier); 
                 const spiralFactor = 8;
                 
                 for (let i = 0; i < giftCount; i++) {
-                    const heightRatio = 0.3 + Math.random() * 0.2; // 0.3-0.5
+                    const heightRatio = 0.3 + Math.random() * 0.2; 
                     const currentHeight = treeHeight * heightRatio;
-                    const y = this.crownBaseY - currentHeight; // 使用树冠基准点
+                    const y = this.crownBaseY - currentHeight;
                     
-                    const radiusRatio = 0.5 + Math.random() * 0.4; // 0.5-0.9
+                    const radiusRatio = 0.5 + Math.random() * 0.4; 
                     const currentRadius = maxRadius * (1 - heightRatio) * radiusRatio;
                     
                     const spiralAngle = i * (Math.PI * 2 / giftCount) + heightRatio * spiralFactor;
@@ -662,7 +710,7 @@
                     
                     const colorSet = this.GIFT_COLORS[Math.floor(Math.random() * this.GIFT_COLORS.length)];
                     
-                    const size = (0.75 + Math.random() * 0.75) * this.treeScale * 30; // 调整礼盒尺寸
+                    const size = (0.75 + Math.random() * 0.75) * this.treeScale * 30; 
                     
                     const rotation = Math.random() * Math.PI * 2;
                     const rotationSpeed = (Math.random() - 0.5) * 0.01;
@@ -690,16 +738,16 @@
                 }
             }
 
-            createSpiralLights() {
-                const treeHeight = 620 * this.treeScale; // 调整树高
-                const maxRadius = 280 * this.treeScale; // 增加最大半径
-                const spiralCount = 100; // 增加螺旋灯带数量
+            createSpiralLights(multiplier = 1) {
+                const treeHeight = 620 * this.treeScale; 
+                const maxRadius = 280 * this.treeScale; 
+                const spiralCount = Math.floor(100 * multiplier); 
                 const spiralTurns = 5;
                 
                 for (let i = 0; i < spiralCount; i++) {
                     const t = i / spiralCount;
                     const currentHeight = treeHeight * t;
-                    const y = this.crownBaseY - currentHeight; // 使用树冠基准点
+                    const y = this.crownBaseY - currentHeight; 
                     
                     const angle = t * Math.PI * 2 * spiralTurns + t * 10;
                     
@@ -710,11 +758,11 @@
                     
                     const color = this.SPIRAL_LIGHT_COLORS[i % this.SPIRAL_LIGHT_COLORS.length];
                     
-                    const size = 1.8 + Math.random() * 1.8; // 调整灯带尺寸
+                    const size = 1.8 + Math.random() * 1.8; 
                     const pulseSpeed = 2.0 + Math.random() * 2.0;
                     const phase = Math.random() * Math.PI * 2;
                     const baseAlpha = 0.6 + Math.random() * 0.4;
-                    const glow = 10 + Math.random() * 20; // 调整发光范围
+                    const glow = 10 + Math.random() * 20; 
                     
                     this.spiralLights.push({
                         x: x, y: y, z: z,
@@ -735,18 +783,18 @@
             }
 
             createTopStar() {
-                const treeHeight = 620 * this.treeScale; // 调整树高
-                const topY = this.crownBaseY - treeHeight; // 使用树冠基准点
+                const treeHeight = 620 * this.treeScale; 
+                const topY = this.crownBaseY - treeHeight;
                 
                 this.topStar = {
                     x: this.centerX,
-                    y: topY - 30, // 将星星再上移一些，为顶部礼盒腾出更多空间
-                    size: 30 * this.treeScale, // 调整星星尺寸
+                    y: topY - 30, 
+                    size: 30 * this.treeScale, 
                     color: '#FFD700',
                     rotation: 0,
-                    rotationSpeed: 0.01,
+                    rotationSpeed: 0.01, // 固定星星自转速度
                     pulseSpeed: 0.8,
-                    glowSize: 48 * this.treeScale, // 调整星星发光范围
+                    glowSize: 48 * this.treeScale, 
                     spikes: 5,
                     innerRadius: 0.4,
                     outerRadius: 1,
@@ -757,12 +805,13 @@
             }
 
             createSnowflakes() {
-                for (let i = 0; i < 500; i++) { // 增加雪花数量
+                const snowflakeCount = this.isMobileDevice ? 300 : 500; // 手机端减少雪花数量
+                for (let i = 0; i < snowflakeCount; i++) { 
                     this.snowflakes.push({
                         x: Math.random() * this.screenWidth,
                         y: Math.random() * this.screenHeight,
                         z: Math.random() * 2 + 0.5,
-                        size: Math.random() * 4 + 3, // 减小雪花尺寸
+                        size: Math.random() * 4 + 3, 
                         baseSize: Math.random() * 4 + 3,
                         speedY: Math.random() * 1 + 0.5,
                         swayAmp: Math.random() * 2,
@@ -785,10 +834,9 @@
             update() {
                 const time = Date.now() / 1000;
                 
-                // 自动旋转
+                // 关键修复：确保自动旋转持续进行
                 this.autoRotation += this.rotationSpeed;
                 
-                // 缓慢生长
                 if (this.growthProgress < this.maxGrowth) {
                     this.growthProgress += 0.001;
                 }
@@ -846,7 +894,7 @@
                     }
                 });
 
-                // 更新顶部礼盒
+                // 更新顶部礼物
                 this.topGifts.forEach(gift => {
                     const rotation = this.autoRotation;
                     const cos = Math.cos(rotation);
@@ -859,18 +907,14 @@
 
                     gift.x = rotatedX * growthFactor + this.centerX;
                     
-                    // 顶部礼盒有特殊的浮动效果
                     const floatOffset = Math.sin(time * gift.floatSpeed + gift.timeOffset) * gift.floatHeight;
                     const spiralSway = Math.sin(time * 0.3 + gift.spiralAngle) * 4;
                     gift.y = gift.baseY * growthFactor + Math.sin(time * gift.swaySpeed + gift.swayOffset) * 3 + spiralSway + floatOffset;
                     
-                    // 顶部礼盒旋转更快
                     gift.rotation += gift.rotationSpeed + 0.004;
                     
-                    // 顶部礼盒发光效果最强
                     gift.glow = 0.5 + 0.4 * Math.sin(time * 2.0 + gift.timeOffset);
                     
-                    // 顶部礼盒闪烁更频繁
                     if (Math.random() < 0.015) {
                         gift.sparkleTimer = 20;
                         gift.sparkleIntensity = 0.6 + Math.random() * 0.6;
@@ -881,7 +925,7 @@
                     }
                 });
 
-                // 更新上部礼盒
+                // 更新上层礼物
                 this.upperGifts.forEach(gift => {
                     const rotation = this.autoRotation;
                     const cos = Math.cos(rotation);
@@ -911,7 +955,7 @@
                     }
                 });
 
-                // 更新中部礼盒
+                // 更新中层礼物
                 this.gifts.forEach(gift => {
                     const rotation = this.autoRotation;
                     const cos = Math.cos(rotation);
@@ -941,7 +985,7 @@
                     }
                 });
 
-                // 更新螺旋灯带
+                // 更新螺旋灯光
                 this.spiralLights.forEach(light => {
                     const rotation = this.autoRotation;
                     const cos = Math.cos(rotation);
@@ -982,7 +1026,7 @@
                     if (s.y > this.screenHeight) {
                         s.y = -10;
                         s.x = Math.random() * this.screenWidth;
-                        s.size = s.baseSize = Math.random() * 4 + 3; // 更新为新的基础尺寸
+                        s.size = s.baseSize = Math.random() * 4 + 3; 
                         s.growth = 0;
                         s.targetSize = Math.random() * 1.8 + 1;
                     }
@@ -995,8 +1039,8 @@
                     this.topStar.time = time;
                     this.topStar.rotation += this.topStar.rotationSpeed;
                     
-                    this.topStar.size = 30 * this.treeScale + Math.sin(time * this.topStar.pulseSpeed) * 3.5; // 调整脉动幅度
-                    this.topStar.glowSize = 48 * this.treeScale + Math.sin(time * 1.5) * 8; // 调整脉动幅度
+                    this.topStar.size = 30 * this.treeScale + Math.sin(time * this.topStar.pulseSpeed) * 3.5; 
+                    this.topStar.glowSize = 48 * this.treeScale + Math.sin(time * 1.5) * 8; 
                     
                     this.topStar.sparkleInterval++;
                     if (this.topStar.sparkleInterval > 30 + Math.random() * 50) {
@@ -1028,7 +1072,10 @@
             drawSpiralLight(x, y, size, color, alpha, glow, trailLength, trailOffset) {
                 const ctx = this.ctx;
                 
-                for (let i = 0; i < trailLength; i++) {
+                // 手机端减少拖尾效果
+                const maxTrail = this.isMobileDevice ? Math.min(2, trailLength) : trailLength;
+                
+                for (let i = 0; i < maxTrail; i++) {
                     if (i === trailOffset) continue;
                     
                     const trailAlpha = alpha * (1 - i / trailLength) * 0.3;
@@ -1272,11 +1319,16 @@
             }
 
             draw() {
+                // 更新动画状态
+                this.update();
+                
+                // 清除画布
                 this.ctx.fillStyle = "#0a0a2a";
                 this.ctx.fillRect(0, 0, this.screenWidth, this.screenHeight);
 
                 this.ctx.globalCompositeOperation = 'lighter';
 
+                // 绘制树干粒子
                 this.particles.forEach(p => {
                     this.ctx.beginPath();
                     const sizeMultiplier = p.isTrunk ? 1.5 : 1;
@@ -1287,7 +1339,7 @@
                     this.ctx.fill();
                 });
 
-                // 绘制螺旋灯带
+                // 绘制螺旋灯
                 this.spiralLights.forEach(light => {
                     const growthFactor = Math.min(1, light.growth + this.growthProgress);
                     this.drawSpiralLight(
@@ -1302,7 +1354,7 @@
                     );
                 });
 
-                // 绘制中部礼盒
+                // 绘制礼物
                 this.gifts.forEach(gift => {
                     const sparkleIntensity = gift.sparkleTimer > 0 ? 
                         (gift.sparkleIntensity * (gift.sparkleTimer / 15)) : 0;
@@ -1319,7 +1371,6 @@
                     );
                 });
 
-                // 绘制上部礼盒
                 this.upperGifts.forEach(gift => {
                     const sparkleIntensity = gift.sparkleTimer > 0 ? 
                         (gift.sparkleIntensity * (gift.sparkleTimer / 18)) : 0;
@@ -1336,7 +1387,6 @@
                     );
                 });
 
-                // 绘制顶部礼盒（最后绘制，在最上层）
                 this.topGifts.forEach(gift => {
                     const sparkleIntensity = gift.sparkleTimer > 0 ? 
                         (gift.sparkleIntensity * (gift.sparkleTimer / 20)) : 0;
@@ -1353,12 +1403,14 @@
                     );
                 });
 
+                // 绘制灯
                 this.lights.forEach(l => {
                     const growthFactor = Math.min(1, l.growth + this.growthProgress);
                     let depthBoost = l.z > 0 ? 1.1 : 1.0;
                     this.drawLightGlow(l.x, l.y, l.size * this.treeScale * growthFactor, l.color, l.alpha * depthBoost, l.glow * this.treeScale * growthFactor);
                     
-                    if (Math.random() < 0.02) {
+                    // 手机端减少闪光效果
+                    if (!this.isMobileDevice && Math.random() < 0.02) {
                         this.drawSparkle(
                             l.x + (Math.random()-0.5)*4,
                             l.y + (Math.random()-0.5)*4,
@@ -1368,6 +1420,7 @@
                     }
                 });
 
+                // 绘制顶部星星
                 if (this.topStar) {
                     const star = this.topStar;
                     const time = Date.now() / 1000;
@@ -1463,64 +1516,73 @@
                         }
                     }
                     
-                    switch(s.type) {
-                        case 0:
-                            this.drawHexagonSnowflake(s.x, s.y, s.size, s.rotation, s.opacity);
-                            break;
-                        case 1:
-                            this.drawStarSnowflake(s.x, s.y, s.size, s.rotation, s.opacity);
-                            break;
-                        case 2:
-                            this.drawFlowerSnowflake(s.x, s.y, s.size, s.rotation, s.opacity);
-                            break;
+                    // 性能优化：远处雪花简化绘制
+                    if (this.isMobileDevice && s.z < 1.2) {
+                        this.ctx.beginPath();
+                        this.ctx.arc(s.x, s.y, s.size * 0.5, 0, Math.PI * 2);
+                        this.ctx.fillStyle = `rgba(255, 255, 255, ${s.opacity * 0.7})`;
+                        this.ctx.fill();
+                    } else {
+                        switch(s.type) {
+                            case 0:
+                                this.drawHexagonSnowflake(s.x, s.y, s.size, s.rotation, s.opacity);
+                                break;
+                            case 1:
+                                this.drawStarSnowflake(s.x, s.y, s.size, s.rotation, s.opacity);
+                                break;
+                            case 2:
+                                this.drawFlowerSnowflake(s.x, s.y, s.size, s.rotation, s.opacity);
+                                break;
+                        }
                     }
                 });
 
                 this.ctx.globalAlpha = 1.0;
+                
+                // 关键修复：持续请求动画帧
+                this.animationFrameId = requestAnimationFrame(() => this.draw());
             }
 
             startAnimation() {
-                const animate = () => {
-                    this.update();
-                    this.draw();
-                    requestAnimationFrame(animate);
-                };
-                animate();
+                // 关键修复：确保动画循环开始
+                this.animationFrameId = requestAnimationFrame(() => this.draw());
             }
         }
 
+        // 页面加载完成
         window.addEventListener('load', () => {
             document.body.style.overflow = 'hidden';
             document.documentElement.style.overflow = 'hidden';
             
-            // 隐藏地址栏（移动设备）
+            // 防止页面滚动
             setTimeout(() => {
                 window.scrollTo(0, 1);
             }, 0);
             
-            // 延迟初始化以确保尺寸正确
+            // 初始化动画
             setTimeout(() => {
                 const animation = new ChristmasAnimation();
-                
-                // 存储引用以便在控制台调试
                 window.christmasAnimation = animation;
                 
-                // 页面可见性变化时重绘
+                // 页面可见性变化时重新调整
                 document.addEventListener('visibilitychange', () => {
                     if (!document.hidden) {
-                        animation.handleResize();
+                        setTimeout(() => {
+                            animation.handleResize();
+                        }, 100);
                     }
                 });
             }, 100);
         });
 
+        // 横竖屏切换处理
         window.addEventListener('orientationchange', () => {
             setTimeout(() => {
                 window.scrollTo(0, 0);
                 if (window.christmasAnimation) {
                     window.christmasAnimation.handleResize();
                 }
-            }, 100);
+            }, 300);
         });
 
         // 防止双击缩放
